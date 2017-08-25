@@ -1,0 +1,12 @@
+@startuml
+skinparam defaultTextAlignment left
+caption Behavior of thing CalibrationValidator
+[*] --> Validator
+state Validator{
+state Idle{
+
+Idle --> Idle : m:validator?validate\naction validator!endvalidate()\n
+}
+[*] --> Idle
+}
+@enduml

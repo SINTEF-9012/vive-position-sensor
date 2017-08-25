@@ -1,0 +1,15 @@
+@startuml
+skinparam defaultTextAlignment left
+caption Behavior of thing Runner
+[*] --> Running
+state Running{
+state Idle{
+
+Idle --> Running : Progress?run
+}
+state Running{
+	Running : a:Position?baseStationAngles / \naction do \n'Vec p = positionFromAngles(' & baseStationAngles.bh & ',' & baseStationAngles.bv & ',' & baseStationAngles.ch & ',' & baseStationAngles.cv & ');'\nPosition!cartesianCoordinates(...)\nend\n
+}
+[*] --> Idle
+}
+@enduml

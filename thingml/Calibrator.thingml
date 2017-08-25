@@ -1,0 +1,234 @@
+import "../_Datatypes.thingml"
+import "Messages.thingml"
+
+thing fragment eCalibration
+{
+	message calibrate()
+	message entrypoint()
+    
+    message endcalibrate()
+    message errcalibrate()
+    
+	message receiveAngles(bh : Double, bv : Double, ch : Double, cv : Double)
+	message receivecalibration(bx : Double, by : Double, bz : Double, brx : Double, bry : Double, brz : Double, cx : Double, cy : Double, cz : Double, crx : Double, cry : Double, crz : Double)
+	message calibrationfromserial();
+}
+
+thing fragment iCalibration
+{
+	message calibrating()
+	message calibrationComplete()
+	message calibrationFailed()
+}
+
+thing Calibrator includes iCalibration, eCalibration, StatusMessages
+@c_header "
+    #include <Timer.h>
+    #include <constants.h>
+    #include <calibration.hpp>
+"
+@c_global "
+    double angleValues[CALIBRATION_POINT_COLLECTION_COUNT][4] = {0};
+    int angleIndex = 0;
+    bool endCalibration = 0;
+    
+    uint8_t fourCounter = 0;
+"
+{
+	
+	provided port calibrator {
+		receives calibrate, entrypoint, receiveAngles, receivecalibration
+		sends endcalibrate, errcalibrate, calibrationfromserial
+	}
+	
+	provided port StatusSender {
+	    sends status
+	}
+	
+	internal port avt {
+		sends calibrating, calibrationComplete, calibrationFailed
+		receives calibrating, calibrationComplete, calibrationFailed
+	}
+	
+	statechart Calibrator init Idle
+	{
+		on entry do
+		
+		end
+		state Idle {
+		    
+			transition calibrate -> Calibrate event m: calibrator?calibrate
+		}
+		
+		state Calibrate {
+		    
+		    on entry do
+		    
+                if ('endCalibration') do
+                    if ('calibrationFailed') do                    
+                        StatusSender!status(7)
+                        avt!calibrationFailed()
+                    end else do
+                        StatusSender!status(4)
+                        if ('DEBUG') printCalibration()
+                        avt!calibrationComplete()
+                    end
+                    
+                    '
+                    endCalibration = 0;
+                    calibrationFailed = false;
+                    '
+                end
+            end
+		    
+			transition -> PointCollect event calibrator?entrypoint
+			
+			transition -> Idle event avt?calibrationComplete action calibrator!endcalibrate()
+			transition -> Idle event avt?calibrationFailed action calibrator!errcalibrate()
+			
+			transition -> Calibrate event calibrator?calibrate action 'restartCalibration();'
+		}
+		
+		state PointCollect {
+		    on entry do
+                'angleIndex = 0;'
+                StatusSender!status(2)
+		    end
+		    		  
+		    transition -> Calibrate event calibrator?calibrate action 'restartCalibration();'
+		    		    
+		    transition -> Calibrate event avt?calibrating action do
+		        '
+                double largest[4] = {angleValues[0][0], angleValues[0][1], angleValues[0][2], angleValues[0][3]};
+                double smallest[4] = {angleValues[0][0], angleValues[0][1], angleValues[0][2], angleValues[0][3]};
+                double sum[4] = {0};
+                
+                for (int i = 0; i < CALIBRATION_POINT_COLLECTION_COUNT; i++) {
+                    for (int j = 0; j <  4; j++) {
+                        if (largest[j] < angleValues[i][j]) largest[j] = angleValues[i][j];
+                        if (smallest[j] > angleValues[i][j]) smallest[j] = angleValues[i][j];
+                        sum[j] += angleValues[i][j];
+                    }
+                }
+                
+                double average[4] = {0};
+                bool ok = true;
+                
+                for (int j = 0; j <  4; j++) {
+                    if (largest[j] - smallest[j] > LARGEST_ANGLE_DEVIATION_FOR_SINGLE_MEASURNMENT) {'
+                        // Error, too large deviation 
+                        'ok = false;
+                    }
+                    average[j] = sum[j]/CALIBRATION_POINT_COLLECTION_COUNT;
+                } 
+                
+                if (ok) {
+                    'StatusSender!status(8)'
+                    
+                    STOP = true;
+                    endCalibration = collectAnglesForPoint(average[0], average[1], average[2], average[3]);
+                    STOP = false;
+                    ' 
+                                        
+                    // Send measured angles and differences in angles measured
+                    if ('DEBUG') printAngles('average[0]', 'average[1]', 'average[2]', 'average[3]')                 
+                '} else {'
+                    StatusSender!status(9)
+                '}'
+                
+                if ('DEBUG') printVariation('largest[0]-smallest[0]', 'largest[1]-smallest[1]', 'largest[2]-smallest[2]', 'largest[3]-smallest[3]')
+                
+		    end
+		    
+		    internal event angles: calibrator?receiveAngles action do
+                '
+                // Only collect data-points whena all have been refreshed
+                if (++fourCounter == 4) {
+                    fourCounter = 0;
+                    
+                    angleValues[angleIndex][0] = '&angles.bh&';
+                    angleValues[angleIndex][1] = '&angles.bv&';
+                    angleValues[angleIndex][2] = '&angles.ch&';
+                    angleValues[angleIndex][3] = '&angles.cv&';
+                    angleIndex++;
+                }
+                
+                if (angleIndex == CALIBRATION_POINT_COLLECTION_COUNT) {
+                    angleIndex = 0;'
+                    avt!calibrating()
+                '}'
+            end
+		}
+	}
+	
+	function printAngles(bh: Double, bv: Double, ch: Double, cv: Double) do 
+        'if (VERBOSE) Serial.print("\nF,");
+        else Serial.print("\nAverage Angles:\t");
+        
+        Serial.print('&bh&',6);
+        Serial.print(",");
+        Serial.print('&bv&',6);
+        Serial.print(",");
+        Serial.print('&ch&',6);
+        Serial.print(",");
+        Serial.print('&cv&',6);
+        Serial.print(",");'
+	end
+	
+	function printVariation(bh: Double, bv: Double, ch: Double, cv: Double) do 
+        'if (VERBOSE) Serial.print("\nG,");
+        else Serial.print("\nVariation Angles:\t");
+        
+        Serial.print('&bh&',6);
+        Serial.print(",");
+        Serial.print('&bv&',6);
+        Serial.print(",");
+        Serial.print('&ch&',6);
+        Serial.print(",");
+        Serial.print('&cv&',6);
+        Serial.print(",");'
+    end
+	
+	function printCalibration() do
+	   '
+	   if (VERBOSE) Serial.print("\nK,");
+	   else Serial.print("\nCalibration:\n\nPb:\t");
+	   
+	   Serial.print(",");
+       Serial.print(posePb.position.getX());
+       Serial.print(",");
+       Serial.print(posePb.position.getY());
+       Serial.print(",");
+       Serial.print(posePb.position.getZ());
+       Serial.print(",");
+       Serial.print(posePb.orientation.getX());
+       Serial.print(",");
+       Serial.print(posePb.orientation.getY());
+       Serial.print(",");
+       Serial.println(posePb.orientation.getZ());
+       Serial.print(",");
+
+       if (!VERBOSE) Serial.print("\nPc:\t");
+       
+       Serial.print(posePc.position.getX());
+       Serial.print(",");
+       Serial.print(posePc.position.getY());
+       Serial.print(",");
+       Serial.print(posePc.position.getZ());
+       Serial.print(",");
+       Serial.print(posePc.orientation.getX());
+       Serial.print(",");
+       Serial.print(posePc.orientation.getY());
+       Serial.print(",");
+       Serial.println(posePc.orientation.getZ());
+       Serial.print(",");
+       
+       if (!VERBOSE) Serial.print("\n Point 4 error:\t");
+       
+       Serial.print(pointError);
+	   Serial.print(",");
+	   
+	   if (!VERBOSE) Serial.print("\n");
+	   '
+	end
+}

@@ -1,0 +1,364 @@
+import "../_Datatypes.thingml"
+import "../BUTTON.thingml"
+
+thing fragment msgout
+{
+    message printStatus(id : UInt8, verbose : Boolean);
+    message printOperationState(id : UInt8, verbose : Boolean)
+    
+    message printPoint(x: Double, y: Double, z: Double, separation: Double, verbose: Boolean) 
+}
+
+thing fragment msgin
+{
+	message waitcalibration()
+	message calibrationreceived(bx : Double, by : Double, bz : Double, brx : Double, bry : Double, brz : Double, cx : Double, cy : Double, cz : Double, crx : Double, cry : Double, crz : Double)
+}
+thing fragment iserialin
+{
+	message serial_timeout()
+}
+
+
+thing fragment eblinker {
+	message statusID(id : UInt8)
+	message stateID(id: UInt8)
+}
+
+thing fragment iSoftButton
+{
+	message timer_timeout();
+}
+
+thing fragment SoftButtonMsgs
+{
+	message click ();
+	message double_click ();
+	message long_press ();
+}
+
+thing SerialOut includes msgout
+{
+	provided port basic
+    {
+		receives printStatus, printOperationState, printPoint
+	}
+
+
+	statechart Message init Idle {
+		on entry do
+			'Serial.begin(115200);'
+		end
+
+		state Idle {
+
+		    internal event m: basic?printStatus action do 
+		        if (m.verbose) do '
+                    Serial.print("\nH,");
+                    Serial.print('&m.id&');
+                    Serial.print(",");
+                'end else do '
+		            Serial.print("\nStatus:\t");
+		            Serial.print('&m.id&');
+		        'end 
+
+		    end
+		    
+            internal event m: basic?printOperationState action do
+                if (m.verbose) do '
+                    Serial.print("\nI,");
+                    Serial.print('&m.id&');
+                    Serial.print(",");
+                'end else do '
+                    Serial.print("\nState:\t");
+                    Serial.print('&m.id&');
+                'end
+            end
+            
+		    internal event m: basic?printPoint action do
+		        if (m.verbose) do '
+    		        Serial.print("\nJ,");
+    		        Serial.print('&m.x&',3);
+    		        Serial.print(",");
+    		        Serial.print('&m.y&',3);
+    		        Serial.print(",");
+    		        Serial.print('&m.z&',3);
+    		        Serial.print(",");
+    		        Serial.print('&m.separation&',4);
+                    Serial.print(",");
+    		    'end else do '
+                    Serial.print("\nPoint:\t");
+                    Serial.print('&m.x&',3);
+                    Serial.print(",\t");
+                    Serial.print('&m.y&',3);
+                    Serial.print(",\t");
+                    Serial.print('&m.z&',3);
+                    Serial.print(",\t"); 
+                    Serial.print('&m.separation&',4);
+    		    'end
+		    end
+		}
+	}
+}
+
+thing SerialIn includes msgin, iserialin
+@c_header "#include <Timer.h>
+#include <constants.h>"
+@c_global "extern struct SerialIn_Instance serialIn_var;"
+{
+	provided port serialcall
+	{
+		receives waitcalibration
+		sends calibrationreceived
+	}
+
+	internal port Timer {
+		sends serial_timeout
+		receives serial_timeout
+	}
+
+	statechart serialreader init Idle {
+
+		state Idle {
+			transition -> CalibrationReceiver event serialcall?waitcalibration
+		}
+
+		state CalibrationReceiver {
+			on entry 'start_timer(2, 25, &timeout_serialreader);'
+			transition -> Idle event Timer?serial_timeout guard 'Serial.available()' action do
+																'
+																udouble ud ;
+																for(int i = 0; i < 96; i++){
+																		ud.b[i] = Serial.read();
+																 }'
+																 serialcall!calibrationreceived('ud.d[0]','ud.d[1]','ud.d[2]','ud.d[3]','ud.d[4]','ud.d[5]','ud.d[6]','ud.d[7]','ud.d[8]','ud.d[9]','ud.d[10]','ud.d[11]')
+													  end
+		}
+
+	}
+
+	function timeout_serialreader()
+	@c_prototype "void timeout_serialreader()"
+	do
+		'SerialIn_send_Timer_serial_timeout(&serialIn_var);'
+	end
+}
+
+thing SoftButton includes ButtonMsgs, iSoftButton, SoftButtonMsgs
+@c_header "#include <Timer.h>"
+@c_global "extern struct SoftButton_Instance softButton_var;"
+{
+
+	readonly property long_delay : UInt16 = 1000
+	readonly property double_delay : UInt16 = 250
+
+	required port Button
+    {
+		receives press, release
+	}
+
+	internal port Timer {
+		sends timer_timeout
+		receives timer_timeout
+	}
+
+	provided port SoftButton
+    {
+		sends click, double_click, long_press
+	}
+
+	function timeout_button()
+	@c_prototype "void timeout_button()"
+	do
+		'SoftButton_send_Timer_timer_timeout(&softButton_var);'
+	end
+
+	statechart SoftButtonImpl init Idle
+    {
+        state Idle
+        {
+            transition pressed -> Pressed
+            event m: Button?press
+        }
+
+        state Pressed
+        {
+			on entry 'start_timer(1, '&long_delay&', &timeout_button);'
+			on exit 'timer_cancel(1);'
+			transition long -> Idle
+			event Timer?timer_timeout
+			action SoftButton!long_press()
+
+			transition click -> Released
+			event Button?release
+        }
+
+        state Released
+        {
+        	on entry 'start_timer(1, '&double_delay&', &timeout_button);'
+        	on exit 'timer_cancel(1);'
+
+        	transition click -> Idle
+			event Timer?timer_timeout
+			action SoftButton!click()
+
+			transition double -> Idle
+            event Button?press
+            action SoftButton!double_click()
+        }
+    }
+}
+
+thing Blinker includes eblinker
+@c_header"
+#include <Timer.h>
+#include <Adafruit_NeoPixel.h>
+#include <Color_Helper.h>
+"
+@c_global"
+extern struct Blinker_Instance blinker_var;
+boolean current_blink = HIGH;
+
+#define PIN 8
+#define NUM_LEDS 1
+#define BRIGHTNESS 50
+
+uint32_t returnColor = RED;
+bool timeout = false;
+int8_t timeoutPriority = 0;
+
+Adafruit_NeoPixel led = Adafruit_NeoPixel(NUM_LEDS, PIN, NEO_GRBW + NEO_KHZ800);
+"{
+
+    message blink();
+
+	internal port evt {
+        sends blink
+		receives blink
+	}
+
+	provided port neopixel {
+		receives stateID, statusID
+	}
+
+
+	// Flashing onboard LED
+
+	function startLEDFlashAfterDuration(duration : UInt32) do
+		'start_timer(5, '&duration&', &callback_message_flash);'
+	end
+
+    function callback_message_flash()
+    @c_prototype "void callback_message_flash()"
+    do'
+        Blinker_send_evt_blink(&blinker_var);
+        start_timer(5, 100, &callback_message_flash);
+        '
+    end
+
+
+    // Neopixel with colored status-messages
+
+    function setColorForDuration(color : UInt32, duration : UInt32) do
+        'led.setPixelColor(0, '&color&');
+        led.show();'
+        'start_timer(6, '&duration&', &callback_message_neopixel);'
+    end
+
+	function callback_message_neopixel()
+	@c_prototype "void callback_message_neopixel()"
+	do '
+        led.setPixelColor(0, returnColor);
+        led.show();
+        '
+	end
+
+
+	// Timeout inputs
+
+    function timeoutColorChangeForDuration(duration : UInt32) do
+        'timeout = true;'
+        'start_timer(7, '&duration&', &callback_message_timeout);'
+    end
+
+    function callback_message_timeout()
+    @c_prototype "void callback_message_timeout()"
+    do
+        'timeout = false;'
+    end
+
+
+	statechart BlinkerState init Idle
+    {
+    	on entry do 'pinMode(13, OUTPUT);
+    				 led.setBrightness(BRIGHTNESS);
+					 led.begin();
+					 led.show();
+    				 '
+    				 startLEDFlashAfterDuration(1000)
+				end
+
+		internal event m: evt?blink action do '
+		    digitalWriteFast(13, current_blink);
+    		current_blink = (current_blink == HIGH)? LOW : HIGH;
+    	    '
+    	end
+
+
+		internal event m: neopixel?stateID action do '
+
+    		switch('&m.id&') {
+    		    case 1: returnColor  = ORANGE; break; // LoadCalibration
+    		    case 2: returnColor  = WHITE; break;  // Calibration
+    		    case 3: returnColor  = ORANGE; break; // Validate_Calibration
+    		    case 4: returnColor  = GREEN;  break; // Runner
+    		    default: returnColor = BLACK;
+    		}
+
+    		if (!timeout) {
+    		    led.setPixelColor(0, returnColor);
+    		    led.show();
+    		    'timeoutColorChangeForDuration(1000)'
+    		}
+      		'
+		end
+
+		internal event m: neopixel?statusID action do '
+
+    		uint32_t flashColor;
+    		int8_t priority;
+
+    		switch('&m.id&') {
+    			case 0:  flashColor = RED;           priority = 1; break;
+    			case 1:  flashColor = BLUE;          priority = 0; break;
+    			case 2:  flashColor = LIME;          priority = 1; break;
+    			case 3:  flashColor = LAVENDER;      priority =-1; break;
+    			case 4:  flashColor = DARK_GREEN;    priority = 4; break;
+    			case 5:  flashColor = DARK_GREEN;    priority = 3; break;
+    			case 6:  flashColor = DARK_RED;      priority = 3; break;
+    			case 7:  flashColor = DARK_RED;      priority = 4; break;
+    			case 8:  flashColor = GREEN;         priority = 2; break;
+    			case 9:  flashColor = RED;           priority = 2; break;
+    			case 10: flashColor = YELLOW;        priority = 0; break;
+    			case 11: flashColor = BROWN;         priority = 1; break;
+    			case 12: flashColor = CIAN;          priority = 0; break;
+    			case 13: flashColor = DARK_GREEN;    priority = 0; break;
+    			case 14: flashColor = PURPLE;        priority =-1; break;
+    			case 15: flashColor = GREY;          priority = 0; break;
+    			default: flashColor = BLACK;         priority = 0;
+        	}
+        	if (!timeout || priority > timeoutPriority) {
+        	    timeoutPriority = priority;
+        	    uint16_t duration = priority > 0 ? 600 : 100;'
+    		    setColorForDuration('flashColor', 'duration+100')
+    		    timeoutColorChangeForDuration('duration')
+    		'}'
+
+		end
+
+    	state Idle {
+    	   on entry do
+    	   end
+    	}
+    }
+}

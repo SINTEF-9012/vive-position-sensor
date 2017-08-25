@@ -1,0 +1,95 @@
+import "../_Datatypes.thingml"
+import "Save_Load.thingml"
+
+thing fragment eCalibrationStorer
+{
+	message load()
+	message endload()
+	message errorload()
+	
+	message save()
+}
+
+
+thing CalibrationStorer includes StoreMessages, eCalibrationStorer
+@c_header "
+    #import <calibration.hpp>
+"
+@c_global "
+    #define STORE_KEY 42
+"
+
+{
+	required port storeReader {
+	    sends readByte, readConfig
+		receives byteRead, configRead
+	}
+	
+	required port storeWriter {
+	    sends writeByte, writeConfig
+    	receives byteWritten, configWritten
+	}
+	
+	provided port storer {
+		receives load, save
+		sends endload, errorload
+	}
+	
+	message storerToIdle()
+	
+	internal port progress {
+	    sends storerToIdle
+	    receives storerToIdle
+	}
+	
+	statechart Loader init Idle
+	{
+		
+		state Idle {
+		    
+			transition -> Load event storer?load
+			transition -> Save event storer?save
+		}
+		
+		state Load {
+		    
+		    on entry do
+		        storeReader!readByte(0)
+		    end		    
+		    
+		    internal event m: storeReader?byteRead action do
+                
+                if (m.val == 'STORE_KEY') storeReader!readConfig()
+                else do
+                    storer!errorload()
+                    progress!storerToIdle()
+                end
+            end
+		    
+			transition -> Idle event m: storeReader?configRead action do 
+			    '
+                posePb = Pose({'&m.bx&', '&m.by&', '&m.bz&'}, {'&m.brx&', '&m.bry&', '&m.brz&'});
+                posePc = Pose({'&m.cx&', '&m.cy&', '&m.cz&'}, {'&m.crx&', '&m.cry&', '&m.crz&'});
+			    pointError = 0;
+			    calibrationFailed = false;
+			    '
+			    storer!endload()
+			end
+			
+			transition -> Idle event progress?storerToIdle
+		}
+		
+		state Save {
+            
+            on entry do 
+                storeWriter!writeByte(0, 'STORE_KEY')
+                storeWriter!writeConfig('posePb.position.getX()', 'posePb.position.getY()', 'posePb.position.getZ()', 
+                                        'posePb.orientation.getX()', 'posePb.orientation.getY()', 'posePb.orientation.getZ()', 
+                                        'posePc.position.getX()', 'posePc.position.getY()', 'posePc.position.getZ()', 
+                                        'posePc.orientation.getX()', 'posePc.orientation.getY()', 'posePc.orientation.getZ()')
+            end
+            
+            transition -> Idle event storeWriter?configWritten
+		}
+	}
+}

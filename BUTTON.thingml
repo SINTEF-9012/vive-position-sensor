@@ -1,0 +1,61 @@
+import "_Datatypes.thingml"
+
+thing fragment ButtonMsgs 
+{
+	message press ();
+	message release ();
+}
+
+thing fragment TimerMessages
+{
+	message ms25_tic();
+}
+
+thing Button includes ButtonMsgs, TimerMessages
+@c_header "#include <Timer.h>"
+@c_global "extern struct Button_Instance button_var;"
+{		
+	
+	internal port clock {
+		sends ms25_tic
+		receives ms25_tic
+	}
+	
+	provided port evt 
+	{
+		sends press, release
+	}
+	
+	property PIN: UInt8 = 7
+	
+	function is_pressed() : Boolean do
+		return '1 - digitalRead('&PIN&')'
+	end
+	
+	function time_25ms()
+	@c_prototype "void time_25ms()"
+	do
+		'Button_send_clock_ms25_tic(&button_var);'
+		'start_timer(0, 25, &time_25ms);'	
+	end
+
+	statechart Button init RELEASED {
+		on entry do 
+			'pinMode('&PIN&', INPUT_PULLUP);
+			initialize_timer();
+			start_timer(0, 125, &time_25ms);'
+		end
+	
+		state RELEASED {
+			transition status -> PRESSED event clock?ms25_tic
+			guard is_pressed()
+			action evt!press()
+		}
+		
+		state PRESSED {
+			transition status -> RELEASED event clock?ms25_tic
+			guard not is_pressed()
+			action evt!release()
+		}
+	}
+}

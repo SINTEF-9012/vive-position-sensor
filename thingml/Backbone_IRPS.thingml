@@ -1,0 +1,200 @@
+import "../_Datatypes.thingml"
+import "Communication.thingml"
+import "CalibrationStorer.thingml"
+import "Calibrator.thingml"
+import "CalibrationValidator.thingml"
+import "Runner.thingml"
+
+import "Messages.thingml"
+
+thing fragment OutputMessage {
+    message positionCoordinates(x: Double, y: Double, z: Double)
+    message nothing()
+}
+
+thing Backbone includes msgout, msgin, eCalibrationStorer, eCalibrationValidator, eCalibration, SoftButtonMsgs, StatusMessages, IRMessages, eRunner, eblinker, OutputMessage
+
+    @c_header "
+        #include <Timer.h>
+        #include <constants.h>
+    "
+    @c_global "
+        extern struct Backbone_Instance backbone_var; // for timeout_angleStatus() function
+
+        bool angleReadingArrived = false; // For alerting user is no angles are received over longer period
+
+        // Globally available debug flags (extern in constants.h)
+        bool DEBUG = false;
+        bool VERBOSE = false;
+    "
+{
+
+    provided port Output {
+        sends positionCoordinates, nothing
+    }
+
+    required port AngleReceiver {
+        receives allAngles
+    }
+
+    required port Run {
+        sends baseStationAngles
+        receives coordinates
+    }
+
+	required port CalibrationStorer {
+		sends load, save
+		receives endload, errorload
+	}
+
+	required port validator {
+		sends validate
+		receives endvalidate, errvalidate
+	}
+
+	required port calibrator {
+		sends calibrate, entrypoint, receiveAngles, receivecalibration
+		receives endcalibrate, errcalibrate,calibrationfromserial
+	}
+
+	required port printer {
+		sends printStatus, printOperationState, printPoint
+	}
+
+	required port serialRead
+    {
+        sends waitcalibration
+        receives calibrationreceived
+    }
+
+    required port pixel {
+    	sends stateID, statusID
+    }
+
+	required port presser {
+		receives click, double_click, long_press
+	}
+
+
+	required port StatusHandler {
+        receives status
+    }
+
+    internal port StateHandler {
+        sends currentState
+        receives currentState
+    }
+
+
+    message toIdle()
+
+	internal port transitions {
+	    sends toIdle
+	    receives toIdle
+	}
+
+
+    function sendStatus(id : UInt8) do
+        pixel!statusID(id)
+        'if (DEBUG)' printer!printStatus(id, 'VERBOSE')
+    end
+
+	statechart Main init Load_Calibration {
+
+	    // Discovering spans without incoming signal
+		on entry do '
+		    timeout_angleStatus(); // Start monitoring for durations of no signals
+
+		    pinMode(12, OUTPUT);
+            digitalWriteFast(12, HIGH);
+            pinMode(11, INPUT);
+            DEBUG = !digitalRead(11);
+            '
+		end
+
+		internal event AngleReceiver?allAngles action 'angleReadingArrived = true;'   // Notify of arrived angles
+
+
+        // Handle state/status messages
+        internal event m: StateHandler?currentState action do
+            pixel!stateID(m.id)
+            'if (DEBUG)' printer!printOperationState(m.id, 'VERBOSE')
+        end
+
+		internal event m: StatusHandler?status action sendStatus(m.id)
+
+		internal event presser?double_click action 'VERBOSE = DEBUG & !VERBOSE;'
+
+		state Load_Calibration
+		{
+			on entry do
+				StateHandler!currentState(1)
+				CalibrationStorer!load()
+			end
+
+			transition validate -> Validate_Calibration event m: CalibrationStorer?endload action sendStatus(5)
+			transition calibrate -> Calibration event m: CalibrationStorer?errorload action sendStatus(6)
+		}
+
+		state Calibration
+		{
+			on entry do
+			    StateHandler!currentState(2)
+			    calibrator!calibrate()
+			end
+
+			internal event presser?click action calibrator!entrypoint()
+			internal event m: AngleReceiver?allAngles action calibrator!receiveAngles(m.bh, m.bv, m.ch, m.cv)
+
+			transition restartCalibration -> Calibration event presser?long_press
+
+		    //internal event m: calibrator?calibrationfromserial action serialRead!waitcalibration()
+            //internal event m: serialRead?calibrationreceived action calibrator!receivecalibration(m.bx, m.by, m.bz, m.brx, m.bry, m.brz, m.cx, m.cy, m.cz, m.crx, m.cry, m.crz)
+            //internal event m: calibrator?sendangles action printer!printAngles(m.bh, m.bv, m.ch, m.cv)
+
+		    transition validate -> Validate_Calibration event calibrator?endcalibrate action CalibrationStorer!save()
+			transition recalibrate -> Calibration event m: calibrator?errcalibrate
+		}
+
+		state Validate_Calibration
+		{
+			on entry do
+				StateHandler!currentState(3)
+				validator!validate()
+			end
+			transition Calibrate -> Calibration event m: validator?errvalidate
+			transition Run -> Runner event m: validator?endvalidate
+		}
+
+		state Runner {
+
+		    on entry do
+		        StateHandler!currentState(4)
+		    end
+
+		    transition -> Calibration event presser?long_press
+
+		    internal event angles: AngleReceiver?allAngles action Run!baseStationAngles(angles.bh, angles.bv, angles.ch, angles.cv)
+
+		    internal event m: Run?coordinates action do
+		        if ('DEBUG') printer!printPoint(m.x, m.y, m.z, m.separation, 'VERBOSE')
+
+		        Output!positionCoordinates(m.x, m.y, m.z) // Final output form system
+
+		    end
+		}
+	}
+
+    function timeout_angleStatus()
+    @c_prototype "void timeout_angleStatus()"
+    do
+        'if (angleReadingArrived) {
+             angleReadingArrived = false;
+         } else {
+             f_Backbone_sendStatus(&backbone_var, 14);
+             Backbone_send_Output_nothing(&backbone_var);
+         }
+         start_timer(4, NO_PACKAGES_TO_ERROR_DISPLAY_DURATION, &timeout_angleStatus);
+         '
+    end
+}

@@ -1,0 +1,14 @@
+@startuml
+skinparam defaultTextAlignment left
+caption Behavior of thing Storer
+[*] --> EESave
+state EESave{
+state Idle{
+	Idle : m:reader?readByte / \naction reader!byteRead('EEPROM.read(' & readByte.id & ')')\n
+	Idle : m:reader?readConfig / \naction do \n'\n    			udouble ud; \n    			for (int i = 0; i < 96; i++) {\n    				ud.b[i] = EEPROM.read(i+1);\n    			}'\nreader!configRead(...)\nend\n
+	Idle : m:writer?writeByte / \naction do \n'EEPROM.update(' & writeByte.id & ',' & writeByte.val & ');'\nwriter!byteWritten()\nend\n
+	Idle : m:writer?writeConfig / \naction do \n'\n			\n			    udouble data;\n			    data.d[0] = ' & writeConfig.bx & ';\n			    data.d[1] = ' & writeConfig.by & ';\n			    data.d[2] = ' & writeConfig.bz & ';\n			    data.d[3] = ' & writeConfig.brx & ';\n			    data.d[4] = ' & writeConfig.bry & ';\n			    data.d[5] = ' & writeConfig.brz & ';\n			    data.d[6] = ' & writeConfig.cx & ';\n			    data.d[7] = ' & writeConfig.cy & ';\n			    data.d[8] = ' & writeConfig.cz & ';\n			    data.d[9] = ' & writeConfig.crx & ';\n			    data.d[10] = ' & writeConfig.cry & ';\n			    data.d[11] = ' & writeConfig.crz & ';\n			    			    \n			    for (int i = 0; i < 96; i++) {\n                    EEPROM.update(i+1, data.b[i]);\n                }'\nwriter!configWritten()\nend\n
+}
+[*] --> Idle
+}
+@enduml

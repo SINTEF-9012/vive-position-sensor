@@ -1,0 +1,17 @@
+@startuml
+skinparam defaultTextAlignment left
+caption Behavior of thing Button
+[*] --> Button
+state Button{
+state RELEASED{
+
+RELEASED --> PRESSED : clock?ms25_tic[is_pressed()]\naction evt!press()\n
+}
+state PRESSED{
+
+PRESSED --> RELEASED : clock?ms25_tic[not is_pressed()]\naction evt!release()\n
+}
+[*] --> RELEASED
+	Button : entry / 'pinMode(' & PIN & ', INPUT_PULLUP);\n			initialize_timer();\n			start_timer(0, 125, &time_25ms);'\n
+}
+@enduml

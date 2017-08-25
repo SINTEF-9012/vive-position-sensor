@@ -1,0 +1,16 @@
+import "../_Datatypes.thingml"
+
+thing fragment IRMessages {
+    message pulseDetectedEvent(start : UInt32, duration : UInt32)
+    message packageDetectedEvent(startTimeL1: UInt32, startTimeL2: UInt32, durationL1: UInt32, durationL2: UInt32, signal: UInt32)
+    message allAngles(bh: Double, bv: Double, ch: Double, cv: Double)
+    message timerOverflow() // for handling timer overflow occurring about once a minute 
+}
+
+thing fragment StatusMessages {
+    message status(id: UInt8)
+    message currentState(id: UInt8)
+    
+    message startPrinting()
+    message stopPrinting()
+}

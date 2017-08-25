@@ -1,0 +1,11 @@
+@startuml
+skinparam defaultTextAlignment left
+caption Behavior of thing PackageReader
+[*] --> PackageRead
+state PackageRead{
+state Idle{
+	Idle : a:PulseReceiver?pulseDetectedEvent / \naction pulse(...)\n
+}
+[*] --> Idle
+}
+@enduml

@@ -1,0 +1,48 @@
+import "../Communication.thingml"
+
+
+thing Communication includes msg, eblinker, SoftButtonMsgs
+{
+	required port Blinker
+	{
+		sends erreur
+	}
+	required port Message
+	{
+		sends err_num
+	}
+	required port Button
+	{
+		receives click, double_click, long_press
+	}
+	statechart Main init Idle
+	{
+		state Idle{
+			internal event m: Button?click action Message!err_num(1)
+			internal event m: Button?double_click action do Message!err_num(2) Blinker!erreur(12) end
+			internal event m: Button?long_press action Blinker!erreur(3)
+		}
+	}
+	
+}
+
+
+
+
+
+configuration Teensy 
+@teensy_corepath "../../c_lib/core"
+@teensy_externpath "../../c_lib/utils"
+{
+	/* Begin Application configuration */
+	instance button : Button
+	instance softButton : SoftButton
+	instance blinker : Blinker
+	instance seriala : Seriala
+	instance communication : Communication
+	connector softButton.Button => button.evt
+	connector communication.Blinker => blinker.err
+	connector communication.Message => seriala.basic
+	connector communication.Button => softButton.SoftButton
+	/* End */
+}

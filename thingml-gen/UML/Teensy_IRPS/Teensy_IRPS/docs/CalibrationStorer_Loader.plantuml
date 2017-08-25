@@ -1,0 +1,26 @@
+@startuml
+skinparam defaultTextAlignment left
+caption Behavior of thing CalibrationStorer
+[*] --> Loader
+state Loader{
+state Idle{
+
+Idle --> Load : storerABC?load
+
+Idle --> Save : storerABC?save
+}
+state Load{
+	Load : entry / storeReader!readByte(0)\n
+
+
+Load --> Idle : progress?storerToIdle\n||m:storeReader?configRead\naction do \n'\n                posePb = Pose({' & configRead.bx & ', ' & configRead.by & ', ' & configRead.bz & '}, {' & configRead.brx & ', ' & configRead.bry & ', ' & configRead.brz & '});\n                posePc = Pose({' & configRead.cx & ', ' & configRead.cy & ', ' & configRead.cz & '}, {' & configRead.crx & ', ' & configRead.cry & ', ' & configRead.crz & '});\n			    pointError = 0;\n			    calibrationFailed = false;\n			    '\nstorerABC!endload()\nend\n
+	Load : m:storeReader?byteRead / \naction if(byteRead.val == 'STORE_KEY') do\nstoreReader!readConfig()\nend else do\ndo \nstorerABC!errorload()\nprogress!storerToIdle()\nend\n\n
+}
+state Save{
+	Save : entry / do \nstoreWriter!writeByte(...)\nstoreWriter!writeConfig(...)\nend\n
+
+Save --> Idle : storeWriter?configWritten
+}
+[*] --> Idle
+}
+@enduml

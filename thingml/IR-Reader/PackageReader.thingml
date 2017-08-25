@@ -1,0 +1,141 @@
+import "../../_Datatypes.thingml"
+import "../Messages.thingml"
+
+thing PackageReader includes IRMessages, StatusMessages 
+    
+    @c_header "
+        #include <constants.h>
+    "
+    
+    @c_global "        
+        // startTimes and durations with matching data at same idex
+        uint32_t startTimes [STORED_TIME_STEPS]; // default init to zero in C
+        uint32_t durations [STORED_TIME_STEPS];
+        
+        int identifyedSteps = 0;
+        int startCount = 0;
+    "
+
+{
+    provided port PulseReceiver {
+        receives pulseDetectedEvent
+    }
+    
+    required port PackageSender {
+        sends packageDetectedEvent
+    }
+    
+    provided port StatusSender {
+        sends status
+    }
+        
+    statechart PackageRead init Idle {
+         state Idle {
+            
+            internal event a: PulseReceiver?pulseDetectedEvent action do
+                pulse(a.start, a.duration)
+            end           
+        }
+    }
+    
+    
+    function pulse(startTime : UInt32, duration : UInt32) do
+        '
+        if (DEBUG && VERBOSE) {
+            Serial.println("");Serial.print("A");Serial.print(",");Serial.print(startTime/36);Serial.print(",");Serial.print(duration/36);Serial.print(",");
+        }
+        
+        int last = STORED_TIME_STEPS-1;
+    
+        // Guard against rapid spikes down in the signal
+        if (startTime - (startTimes[last] + durations[last]) < MIN_PULSE_SEPARATION) {
+            // Do nothing, ignore pulse that comes too close to the end of another.
+            // durations[last] = startTime + duration - startTimes[last]; // If wiching to merge peaks
+    
+        } else {
+            
+            // We have detected a propper peak
+            int last = STORED_TIME_STEPS-1;
+    
+            // maintain fifo arrays
+            for (int i = 0 ; i < last ; i++) {
+                startTimes[i] = startTimes[i+1];
+                durations[i] = durations[i+1];
+            }
+    
+            startTimes[last] = startTime;
+            durations[last] = duration;
+    
+    
+            /*
+             * Check for package pattern
+             * 
+             * Strategy:
+             * 1. determine L1 and L2 from separation and duration
+             * 2. use this to determine L3 between two pulses
+             */ 
+    
+            if (identifyedSteps > 1) {
+                identifyedSteps--;
+                return;
+            }
+    
+            // Identify L1 and L2
+            if (L12_DURATION_MIN < durations[0] && durations[0] < L12_DURATION_MAX) {                       // identify L1 candidate
+    
+                if (L12_DURATION_MIN < durations[1] && durations[1] < L12_DURATION_MAX) {                   // identify L2 candidate
+    
+                    uint32_t L12_separation = startTimes[1] - startTimes[0];
+                    if (L12_SEPARATION_MIN < L12_separation && L12_separation < L12_SEPARATION_MAX) {       // verify L1-L2 separation          
+    
+                        uint32_t L13_separation = startTimes[2] - startTimes[0];
+                        if (L13_SEPARATION_MIN < L13_separation && L13_separation < L13_SEPARATION_MAX) {   // verify L1-L3 separation
+    
+                            uint32_t packageL1 = durations[0];
+                            uint32_t packageL2 = durations[1];
+                            uint32_t startTimeL1 = startTimes[0];
+                            uint32_t startTimeL2 = startTimes[1];
+                            
+                            /* 
+                             * Handle possible reflections
+                             * Purpouce:
+                             *  - ensure reflection signal do not disturb next package
+                             *  - ensure we choose the signal going forward to be the direct signal
+                             * Assumption: direct signal-ray is most intense/has longest duration pulse
+                             */
+                             
+                            identifyedSteps = 3;
+                            
+                            int signalIndex = 2;
+                            uint32_t signalDuration = durations[signalIndex];
+                            
+                            for (int i = identifyedSteps ; i < STORED_TIME_STEPS ; i++) {
+                                uint32_t L14_separation = startTimes[i] - startTimes[0];
+                                
+                                if (L14_separation < MIN_PACKAGE_SEPARATION) {
+                                    identifyedSteps++;
+                                    'StatusSender!status(3)'
+                                    
+                                    if (signalDuration < durations[i]) {
+                                        signalIndex = i;
+                                        signalDuration = durations[i];
+                                    }
+                                }
+                            }
+                            
+                            uint32_t packageSignal = startTimes[signalIndex] - startTimeL1;
+                            '
+                            
+                            PackageSender!packageDetectedEvent('startTimeL1', 'startTimeL2', 'packageL1',  'packageL2', 'packageSignal') 
+                            
+                            '
+                            if (DEBUG && VERBOSE) {
+                                Serial.println("");Serial.print("B");Serial.print(",");Serial.print((double) startTimeL1/36,6);Serial.print(",");Serial.print((double) packageL1/36,6);Serial.print(",");Serial.print((double) packageL2/36,6);Serial.print(",");Serial.print((double) packageSignal/36,6);Serial.print(",");Serial.print(identifyedSteps);Serial.print(",");Serial.print((startTimes[identifyedSteps]-startTimeL1)/36);Serial.print(",");
+                            }
+                        }
+                    }
+                }
+            }
+        }'
+    end
+}

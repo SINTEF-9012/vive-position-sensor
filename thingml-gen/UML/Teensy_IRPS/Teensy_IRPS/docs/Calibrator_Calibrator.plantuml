@@ -1,0 +1,30 @@
+@startuml
+skinparam defaultTextAlignment left
+caption Behavior of thing Calibrator
+[*] --> Calibrator
+state Calibrator{
+state Idle{
+
+Idle --> Calibrate : m:calibrator?calibrate
+}
+state Calibrate{
+	Calibrate : entry / if('endCalibration') do\ndo \nif('calibrationFailed') do\ndo \nStatusSender!status(7)\navt!calibrationFailed()\nend\nend else do\ndo \nStatusSender!status(4)\nprintCalibration()\navt!calibrationComplete()\nend\n\n'\n                    endCalibration = 0;\n                    calibrationFailed = false;\n                    '\nend\nend\n
+
+Calibrate --> PointCollect : calibrator?entrypoint
+
+
+Calibrate --> Idle : avt?calibrationFailed\naction calibrator!errcalibrate()\n\n||avt?calibrationComplete\naction calibrator!endcalibrate()\n
+
+Calibrate --> Calibrate : calibrator?calibrate\naction 'restartCalibration();'\n
+}
+state PointCollect{
+	PointCollect : entry / 'angleIndex = 0;'\n
+
+
+PointCollect --> Calibrate : avt?calibrating\naction do \n'\n                double largest[4] = {angleValues[0][0], angleValues[0][1], angleValues[0][2], angleValues[0][3]};\n                double smallest[4] = {angleValues[0][0], angleValues[0][1], angleValues[0][2], angleValues[0][3]};\n                double sum[4] = {0};\n                \n                for (int i = 0; i < CALIBRATION_POINT_COLLECTION_COUNT; i++) {\n                    for (int j = 0; j <  4; j++) {\n                        if (largest[j] < angleValues[i][j]) largest[j] = angleValues[i][j];\n                        if (smallest[j] > angleValues[i][j]) smallest[j] = angleValues[i][j];\n                        sum[j] += angleValues[i][j];\n                    }\n                }\n                \n                double average[4] = {0};\n                bool ok = true;\n                \n                for (int j = 0; j <  4; j++) {\n                    if (largest[j] - smallest[j] > LARGEST_ANGLE_DEVIATION_FOR_SINGLE_MEASURNMENT) {'\n'ok = false;\n                    }\n                    average[j] = sum[j]/CALIBRATION_POINT_COLLECTION_COUNT;\n                } \n                \n                if (ok) {\n                    '\nStatusSender!status(8)\n'\n                    \n                    STOP = true;\n                    endCalibration = collectAnglesForPoint(average[0], average[1], average[2], average[3]);\n                    STOP = false;\n                    '\n...\n'} else {'\nStatusSender!status(9)\ncalibrator!sendangles(...)\n'}'\nend\n\n||calibrator?calibrate\naction 'restartCalibration();'\n
+	PointCollect : angles:calibrator?receiveangle / \naction do \n'\n                // Only collect data-points whena all have been refreshed\n                if (++fourCounter == 4) {\n                    fourCounter = 0;\n                    \n                    angleValues[angleIndex][0] = ' & receiveangle.bh & ';\n                    angleValues[angleIndex][1] = ' & receiveangle.bv & ';\n                    angleValues[angleIndex][2] = ' & receiveangle.ch & ';\n                    angleValues[angleIndex][3] = ' & receiveangle.cv & ';\n                    angleIndex++;\n                }\n                \n                if (angleIndex == CALIBRATION_POINT_COLLECTION_COUNT) {\n                    angleIndex = 0;'\navt!calibrating()\n'}'\nend\n
+}
+[*] --> Idle
+	Calibrator : entry / 
+}
+@enduml

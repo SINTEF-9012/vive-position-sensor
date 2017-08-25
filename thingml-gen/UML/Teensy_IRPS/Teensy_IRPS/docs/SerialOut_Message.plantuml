@@ -1,0 +1,17 @@
+@startuml
+skinparam defaultTextAlignment left
+caption Behavior of thing SerialOut
+[*] --> Message
+state Message{
+state Idle{
+	Idle : m:basic?printStatus / \naction 'Serial.println("");Serial.print("   ");Serial.print(' & printStatus.id & ');'\n
+	Idle : m:basic?printOperationState / \naction 'Serial.println("");Serial.print("State: ");Serial.print(' & printOperationState.id & ');'\n
+	Idle : m:basic?printN / \naction 'Serial.println("");Serial.print("N");Serial.print(",");Serial.print(' & printN.duration & ');Serial.print(",");'\n
+	Idle : m:basic?printPoint / \naction 'Serial.println("");Serial.print(' & printPoint.x & ',3);Serial.print(",\t");Serial.print(' & printPoint.y & ',3);Serial.print(",\t");Serial.print(' & printPoint.z & ',3);Serial.print(",");'\n
+	Idle : m:basic?printAngles / \naction 'Serial.println("");Serial.print(' & printAngles.bh & ',6);Serial.print(",\t");Serial.print(' & printAngles.bv & ',6);Serial.print(",\t");Serial.print(' & printAngles.ch & ',6);Serial.print(",\t");Serial.print(' & printAngles.cv & ',6);Serial.print(",");'\n
+	Idle : m:basic?printLineSeparation / \naction 'Serial.print("\t");Serial.print(' & printLineSeparation.dist & ',3);Serial.print(",");'\n
+}
+[*] --> Idle
+	Message : entry / 'Serial.begin(115200);'\n
+}
+@enduml

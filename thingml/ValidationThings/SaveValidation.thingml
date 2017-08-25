@@ -1,0 +1,46 @@
+import "../Save_Load.thingml"
+
+thing SaveTest includes StoreMessages
+{
+	
+	required port storeReader {
+	    sends readByte, readConfig
+	    receives byteRead, configRead
+	}
+	
+	required port storeWriter {
+        sends writeByte, writeConfig
+        receives byteWritten, configWritten
+    }
+    
+	
+	statechart TestSaver init Idle
+	{
+		on entry do
+			'Serial.begin(115200);'
+		end
+		
+		state Idle {
+			on entry do
+				'delay(3000);'
+				storeReader!readByte(1)
+			end
+			
+			internal event m: storeReader?byteRead action do
+				'Serial.println('&m.val&');'
+				storeWriter!writeByte(1,m.val+1)
+			end
+		}	
+	}
+}
+
+configuration SaveEssaie
+@teensy_corepath "../../c_lib/core"
+@teensy_externpath "../../c_lib/utils"
+{
+	instance saveTest : SaveTest
+	instance storer : Storer
+	
+	connector saveTest.storeReader => storer.reader
+	connector saveTest.storeWriter => storer.writer
+}

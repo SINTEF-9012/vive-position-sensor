@@ -1,0 +1,1543 @@
+thing fragment OutputMessage {
+	message positionCoordinates(x : Double, y : Double, z : Double)
+}
+thing Backbone includes msgout , msgin , eCalibrationStorer , eCalibrationValidator , eCalibration , SoftButtonMsgs , StatusMessages , IRMessages , eRunner , eblinker , OutputMessage @c_header "
+        #include <Timer.h>
+        #include <constants.h>
+    " @c_global "
+        extern struct Backbone_Instance backbone_var; // for timeout_angleStatus() function
+   
+        bool angleReadingArrived = false; // For alerting user is no angles are received over longer period
+        
+        // Globally available debug flags (extern in constants.h)        
+        bool DEBUG = false;
+        bool VERBOSE = false;
+    " {
+	message toIdle()
+	provided port Output {
+		sends positionCoordinates
+	}
+	required port AngleReceiver {
+		receives allAngles
+	}
+	required port Run {
+		sends baseStationAngles receives coordinates
+	}
+	required port CalibrationStorer {
+		sends load sends save receives endload receives errorload
+	}
+	required port validator {
+		sends validate receives endvalidate receives errvalidate
+	}
+	required port calibrator {
+		sends calibrate sends entrypoint sends receiveAngles sends receivecalibration receives endcalibrate receives errcalibrate receives calibrationfromserial
+	}
+	required port printer {
+		sends printStatus sends printOperationState sends printPoint
+	}
+	required port serialRead {
+		sends waitcalibration receives calibrationreceived
+	}
+	required port pixel {
+		sends stateID sends statusID
+	}
+	required port presser {
+		receives click receives double_click receives long_press
+	}
+	required port StatusHandler {
+		receives status
+	}
+	internal port StateHandler {
+		sends currentState receives currentState
+	}
+	internal port transitions {
+		sends toIdle receives toIdle
+	}
+	function sendStatus(id : UInt8) do
+		pixel!statusID(id)
+	'if (DEBUG)'
+		printer!printStatus(id, 'VERBOSE')
+	end
+	function timeout_angleStatus() @c_prototype "void timeout_angleStatus()" do
+	'if (angleReadingArrived) {
+             angleReadingArrived = false;
+         } else {
+             f_Backbone_sendStatus(&backbone_var, 14);
+         }
+         start_timer(4, NO_PACKAGES_TO_ERROR_DISPLAY_DURATION, &timeout_angleStatus);
+         '
+	end
+	statechart Main init Load_Calibration {
+		on entry do
+		'
+		    timeout_angleStatus(); // Start monitoring for durations of no signals
+		    
+		    pinMode(12, OUTPUT);
+            digitalWriteFast(12, HIGH);
+            pinMode(11, INPUT);
+            DEBUG = !digitalRead(11);
+            '
+		end
+		state Load_Calibration {
+			on entry do
+				StateHandler!currentState(1)
+				CalibrationStorer!load()
+			end
+			transition validate -> Validate_Calibration
+			event m : CalibrationStorer?endload
+			action sendStatus(5)
+			transition calibrate -> Calibration
+			event m : CalibrationStorer?errorload
+			action sendStatus(6)
+		}
+		state Calibration {
+			on entry do
+				StateHandler!currentState(2)
+				calibrator!calibrate()
+			end
+			internal
+			event presser?click
+			action calibrator!entrypoint()
+			internal
+			event m : AngleReceiver?allAngles
+			action calibrator!receiveAngles(m.bh, m.bv, m.ch, m.cv)
+			transition restartCalibration -> Calibration
+			event presser?long_press
+			transition validate -> Validate_Calibration
+			event calibrator?endcalibrate
+			action CalibrationStorer!save()
+			transition recalibrate -> Calibration
+			event m : calibrator?errcalibrate
+		}
+		state Validate_Calibration {
+			on entry do
+				StateHandler!currentState(3)
+				validator!validate()
+			end
+			transition Calibrate -> Calibration
+			event m : validator?errvalidate
+			transition Run -> Runner
+			event m : validator?endvalidate
+		}
+		state Runner {
+			on entry do
+				StateHandler!currentState(4)
+			end
+			internal
+			event angles : AngleReceiver?allAngles
+			action Run!baseStationAngles(angles.bh, angles.bv, angles.ch, angles.cv)
+			internal
+			event m : Run?coordinates
+			action do
+				if ('DEBUG') printer!printPoint(m.x, m.y, m.z, m.separation, 'VERBOSE')
+				Output!positionCoordinates(m.x, m.y, m.z)
+			end
+			transition -> Calibration
+			event presser?long_press
+		}
+		internal
+		event AngleReceiver?allAngles
+		action 'angleReadingArrived = true;'
+		internal
+		event m : StateHandler?currentState
+		action do
+			pixel!stateID(m.id)
+		'if (DEBUG)'
+			printer!printOperationState(m.id, 'VERBOSE')
+		end
+		internal
+		event m : StatusHandler?status
+		action sendStatus(m.id)
+		internal
+		event presser?double_click
+		action 'VERBOSE = DEBUG & !VERBOSE;'
+	}
+}
+thing PulseReader includes IRMessages @c_header "
+        #include <constants.h>
+    " @c_global "
+        volatile uint32_t ftm0_cnt_long;
+        extern struct PulseReader_Instance pulseReader_var;
+        bool STOP = false;
+    " {
+	message pulseDetected(start : UInt32, duration : UInt32)
+	required port PulseSender {
+		sends pulseDetectedEvent
+	}
+	required port OverflowNotifier {
+		sends timerOverflow
+	}
+	internal port Transitions {
+		sends pulseDetected receives pulseDetected
+	}
+	function initialize() @c_prototype "void initialize_()" do
+	'
+    	/* --- Setup the analog comparator (CMP1) --- */
+    	SIM_SCGC4 |= SIM_SCGC4_CMP;
+    	CMP1_CR1 = 0x00;
+    	CMP1_CR0 = 0x00;
+
+    	PORTC_PCR3 = 0x0000; // PC3 alternative 0
+    	PORTC_PCR4 = 0x0600; // PC4 alternative 6
+
+    	CMP1_MUXCR = 0x0F; // Positive input 1 - Negative input DAC
+    	CMP1_DACCR = 0xD2; // Enable DAC - Vref = Vin1 - DAC voltage 18/64 * Vin = 1.48V
+    	// The filter will add a delay to the captured pulses, but should not matter as it is the relative time which makes the difference
+    	CMP1_FPR = 0x01; // Set filter period (of bus clock)
+    	CMP1_CR0 = 0x73; // Filter 7 samples - 30mV hysteresis
+    	CMP1_CR1 = 0x13; // Filtered output - Output enable - Comparator enable
+
+    	/* --- Setup the flex-timer to count pulse lengths --- */
+    	SIM_SCGC6 |= SIM_SCGC6_FTM0;
+    	FTM0_SC = 0x00;
+
+    	PORTD_PCR4 = 0x0400; // PD4 alternative 4
+
+    	FTM0_CNTIN = 0x00; // Set counter to 0
+    	FTM0_MOD = 0xFFFF; // Set to free running mode
+    	FTM0_MODE=0x05; // Set FTMEN bit
+
+    	FTM0_C4SC = 0x14; // Capture rising edge - and continuous capture - on channel 4
+    	FTM0_C5SC = 0x48; // Capture falling edge - and enable interrupt - on channel 5
+    	FTM0_COMBINE = 0x00040000; // Enable dual capture mode on channel 4+5
+
+    	FTM0_STATUS = 0x00; // Clear any old interrupts
+    	NVIC_ENABLE_IRQ(IRQ_FTM0); // Enable interrupts for FTM0
+
+    	ftm0_cnt_long = 0; // We can count to 32-bits if we do it manually
+    	FTM0_SC |= 0x40; // Interrupt on overflow
+
+    	FTM0_SC |= 0x08; // Set FTM0 clock to system clock
+    	FTM0_COMBINE |= 0x00080000; // Set DECAP2 to start capture'
+	end
+	function interruptServiceRoutine() @c_prototype "void ftm0_isr(void)" do
+	'// Counter overflow
+    	if (FTM0_SC & 0x80) {
+    		ftm0_cnt_long += 0x10000; // Increment long counter
+    		FTM0_SC &= ~0x80; // Reset flag
+
+            if (ftm0_cnt_long == 0x00000000) {
+                // Adjust calibrationStartTime to account for timer overflow.
+                PulseReader_send_OverflowNotifier_timerOverflow(&pulseReader_var);
+            }
+    	}
+
+        // Falling edge interrupt
+    	if (FTM0_STATUS & 0x20) {
+    		// Read values and prepare FTM0 for new capture
+    		uint32_t rise = FTM0_C4V;
+    		uint32_t fall = FTM0_C5V;
+    		FTM0_STATUS = 0;
+
+    		// Calculate when the events occurred
+    		uint32_t pulse_time, pulse_width;
+    		if (rise < fall) {
+    			// All in one FTM0 counter cycle
+    			pulse_time  = ftm0_cnt_long + rise;
+    			pulse_width = fall - rise;
+    		} else {
+    			// The FTM0 counter overflowed in the middle of the captured pulse
+    			pulse_time  = ftm0_cnt_long + rise - 0x10000;
+    			pulse_width = 0xFFFF - rise + fall;
+    		}
+
+    		if (!STOP) PulseReader_send_Transitions_pulseDetected(&pulseReader_var, pulse_time, pulse_width);
+        }'
+	end
+	statechart PulseRead init Idle {
+		on entry do
+		'initialize_();'
+		end
+		state Idle {
+			internal
+			event m : Transitions?pulseDetected
+			action do
+				PulseSender!pulseDetectedEvent(m.start, m.duration)
+			end
+		}
+	}
+}
+thing PackageReader includes IRMessages , StatusMessages @c_header "
+        #include <constants.h>
+    " @c_global "        
+        // startTimes and durations with matching data at same idex
+        uint32_t startTimes [STORED_TIME_STEPS]; // default init to zero in C
+        uint32_t durations [STORED_TIME_STEPS];
+        
+        int identifyedSteps = 0;
+        int startCount = 0;
+    " {
+	provided port PulseReceiver {
+		receives pulseDetectedEvent
+	}
+	required port PackageSender {
+		sends packageDetectedEvent
+	}
+	provided port StatusSender {
+		sends status
+	}
+	function pulse(startTime : UInt32, duration : UInt32) do
+	'
+        if (DEBUG && VERBOSE) {
+            Serial.println("");Serial.print("A");Serial.print(",");Serial.print(startTime/36);Serial.print(",");Serial.print(duration/36);Serial.print(",");
+        }
+        
+        int last = STORED_TIME_STEPS-1;
+    
+        // Guard against rapid spikes down in the signal
+        if (startTime - (startTimes[last] + durations[last]) < MIN_PULSE_SEPARATION) {
+            // Do nothing, ignore pulse that comes too close to the end of another.
+            // durations[last] = startTime + duration - startTimes[last]; // If wiching to merge peaks
+    
+        } else {
+            
+            // We have detected a propper peak
+            int last = STORED_TIME_STEPS-1;
+    
+            // maintain fifo arrays
+            for (int i = 0 ; i < last ; i++) {
+                startTimes[i] = startTimes[i+1];
+                durations[i] = durations[i+1];
+            }
+    
+            startTimes[last] = startTime;
+            durations[last] = duration;
+    
+    
+            /*
+             * Check for package pattern
+             * 
+             * Strategy:
+             * 1. determine L1 and L2 from separation and duration
+             * 2. use this to determine L3 between two pulses
+             */ 
+    
+            if (identifyedSteps > 1) {
+                identifyedSteps--;
+                return;
+            }
+    
+            // Identify L1 and L2
+            if (L12_DURATION_MIN < durations[0] && durations[0] < L12_DURATION_MAX) {                       // identify L1 candidate
+    
+                if (L12_DURATION_MIN < durations[1] && durations[1] < L12_DURATION_MAX) {                   // identify L2 candidate
+    
+                    uint32_t L12_separation = startTimes[1] - startTimes[0];
+                    if (L12_SEPARATION_MIN < L12_separation && L12_separation < L12_SEPARATION_MAX) {       // verify L1-L2 separation          
+    
+                        uint32_t L13_separation = startTimes[2] - startTimes[0];
+                        if (L13_SEPARATION_MIN < L13_separation && L13_separation < L13_SEPARATION_MAX) {   // verify L1-L3 separation
+    
+                            uint32_t packageL1 = durations[0];
+                            uint32_t packageL2 = durations[1];
+                            uint32_t startTimeL1 = startTimes[0];
+                            uint32_t startTimeL2 = startTimes[1];
+                            
+                            /* 
+                             * Handle possible reflections
+                             * Purpouce:
+                             *  - ensure reflection signal do not disturb next package
+                             *  - ensure we choose the signal going forward to be the direct signal
+                             * Assumption: direct signal-ray is most intense/has longest duration pulse
+                             */
+                             
+                            identifyedSteps = 3;
+                            
+                            int signalIndex = 2;
+                            uint32_t signalDuration = durations[signalIndex];
+                            
+                            for (int i = identifyedSteps ; i < STORED_TIME_STEPS ; i++) {
+                                uint32_t L14_separation = startTimes[i] - startTimes[0];
+                                
+                                if (L14_separation < MIN_PACKAGE_SEPARATION) {
+                                    identifyedSteps++;
+                                    '
+		StatusSender!status(3)
+	'
+                                    
+                                    if (signalDuration < durations[i]) {
+                                        signalIndex = i;
+                                        signalDuration = durations[i];
+                                    }
+                                }
+                            }
+                            
+                            uint32_t packageSignal = startTimes[signalIndex] - startTimeL1;
+                            '
+		PackageSender!packageDetectedEvent('startTimeL1', 'startTimeL2', 'packageL1', 'packageL2', 'packageSignal')
+	'
+                            if (DEBUG && VERBOSE) {
+                                Serial.println("");Serial.print("B");Serial.print(",");Serial.print((double) startTimeL1/36,6);Serial.print(",");Serial.print((double) packageL1/36,6);Serial.print(",");Serial.print((double) packageL2/36,6);Serial.print(",");Serial.print((double) packageSignal/36,6);Serial.print(",");Serial.print(identifyedSteps);Serial.print(",");Serial.print((startTimes[identifyedSteps]-startTimeL1)/36);Serial.print(",");
+                            }
+                        }
+                    }
+                }
+            }
+        }'
+	end
+	statechart PackageRead init Idle {
+		state Idle {
+			internal
+			event a : PulseReceiver?pulseDetectedEvent
+			action do
+				pulse(a.start, a.duration)
+			end
+		}
+	}
+}
+thing AngleReader includes IRMessages , StatusMessages @c_header "
+        #include <constants.h>
+        
+        enum SignalType {
+            // b - master, c - slave
+            // h - horisontal, v - vertical
+            bh = 0, bv = 1, ch = 2, cv = 3, error = 4
+        };
+    " @c_global "
+    
+        // Last package arrays
+        uint32_t L1s [STORED_STEPS];
+        uint32_t L2s [STORED_STEPS];
+        int signalIndex = 0;
+        
+        double signalAngles[4];         // Last read angles sufficiently close to its own previous value
+        double lastSignalAngles[4];     // Last read angles
+        
+        uint32_t lastStartTime = 0;
+        
+        uint32_t calibrationStartTime;
+        int calibrationStep = 0;
+        int initiationCount = 0;
+        int recalibrateCount = 0;
+        
+        int printWhenZero = 0;         // Only print when we have gotten four consecutive angles
+        
+        enum Signal {
+            off = 0, horisontal = 1, vertical = 2
+        };
+        
+        uint32_t average(uint32_t L[], int count) {
+            uint32_t sum = 0;
+        
+            for (int i = 0; i < count; i++) {
+                sum += L[i];
+            }
+            return sum/count;
+        }
+        
+        uint32_t maxVal(uint32_t L[], int count) {
+            uint32_t ret = L[0];
+            for (int i = 1; i<count; i++) {
+                if (L[i] > ret) {
+                    ret = L[i];
+                }
+            }
+            return ret;
+        }
+        
+        uint32_t minVal(uint32_t L[], int count) {
+            uint32_t ret = L[0];
+            for (int i = 1; i<count; i++) {
+                if (L[i] < ret) {
+                    ret = L[i];
+                }
+            }
+            return ret;
+        }
+        
+        Signal classifyPulse(uint32_t signal, uint32_t L[], int count) {
+        
+            int min = minVal(L, count);
+            int max = maxVal(L, count);
+        
+            int category = (7*(signal - min + PULSE_WIDTH_SEPARATION/2))/(max - min);
+            
+            switch (category) {
+                case 0:
+                    return Signal::horisontal;
+                    break;
+                case 1:
+                    return Signal::vertical;
+                    break;
+                case 2:
+                    return Signal::horisontal;
+                    break;
+                case 3:
+                    return Signal::vertical;
+                    break;
+                default:
+                    return Signal::off;
+                    break;
+            }
+        
+            return Signal::off;   
+        }
+        
+        SignalType identifySignal(Signal L1, Signal L2) {
+            return (L1 == Signal::off) ? (L2 == Signal::horisontal) ? SignalType::ch:(L2 == Signal::vertical) ? SignalType::cv : SignalType::error : (L2 == Signal::off) ? (L1 == Signal::horisontal) ? SignalType::bh : (L1 == Signal::vertical) ? SignalType::bv : SignalType::error : SignalType::error;
+        }
+    " {
+	message startTimeCalibrated()
+	message recalibrate()
+	provided port PackageReceiver {
+		receives packageDetectedEvent
+	}
+	provided port AngleSender {
+		sends allAngles
+	}
+	provided port OverflowNotifier {
+		receives timerOverflow
+	}
+	provided port StatusSender {
+		sends status
+	}
+	internal port Transitions {
+		sends startTimeCalibrated sends recalibrate receives startTimeCalibrated receives recalibrate
+	}
+	function updateAngles(inputSignal : UInt32, signalType : UInt8, L2delay : UInt32, calibrated : Boolean) do
+		'
+        SignalType type = SignalType(' & signalType & ');
+        uint32_t signal = (type == SignalType::bh || type == SignalType::bv) ? ' & inputSignal & ' : ' & inputSignal - L2delay & ';
+        
+        double signalAngleMag = PI * ((double) signal)/PERIOD - PI/2;
+        double signalAngle = (type == SignalType::bh || type == SignalType::ch) ? -signalAngleMag : signalAngleMag;
+        
+        // Account for observed deviation in angle measurnment 
+        //signalAngle = signalAngle*(1.0-0.00455);
+        
+        if (type == SignalType::error) {
+            '
+		StatusSender!status(15)
+		'
+            
+        } else {
+           
+            if (abs(signalAngle - lastSignalAngles[type]) < MAX_VALID_ANGLE_DIFFERENCE) {
+                 signalAngles[type] = signalAngle;  // Only print angle for consecutive simular angles
+            } 
+           
+            lastSignalAngles[type] = signalAngle;   // Record last measured angle regardless
+        }
+        
+        if (DEBUG && VERBOSE) {
+            if (' & calibrated & ') {
+                Serial.print("\nD,");
+                Serial.print(type);
+                Serial.print(",");
+                Serial.print(signalAngle,6);
+                Serial.print(",");
+            }
+            
+            if (type == SignalType::bh) {
+                Serial.print("\nE,");
+                Serial.print(signalAngles[0],6);
+                Serial.print(",");
+                Serial.print(signalAngles[1],6);
+                Serial.print(",");
+                Serial.print(signalAngles[2],6);
+                Serial.print(",");
+                Serial.print(signalAngles[3],6);
+                Serial.print(",");
+            }
+        }
+        '
+	end
+	function printAngleInformation(L1 : UInt32, L2 : UInt32) do
+		'
+        Signal L1Type = classifyPulse(' & L1 & ', L1s, STORED_STEPS);
+        Signal L2Type = classifyPulse(' & L2 & ', L2s, STORED_STEPS);
+        SignalType signalType = identifySignal(L1Type, L2Type);
+
+        Serial.print("\nC,");
+        Serial.print((int) L1Type);
+        Serial.print(",");
+        Serial.print((int) L2Type);
+        Serial.print(",");
+        Serial.print((int) signalType);
+        Serial.print(",");
+        Serial.print(calibrationStep);
+        Serial.print(",");
+        '
+	end
+	function updateLastPackageArrays(L1 : UInt32, L2 : UInt32) do
+		'
+        L1s[signalIndex] = ' & L1 & ';
+        L2s[signalIndex] = ' & L2 & ';
+        
+        // update index for next itteration
+        if (signalIndex < STORED_STEPS) {
+            signalIndex++;
+        } else {
+            signalIndex = 0;
+        }
+        '
+	end
+	statechart SingalDetectionStrategy init PulseWidths {
+		state PulseWidths {
+			on entry StatusSender!status(12)
+			internal
+			event a : PackageReceiver?packageDetectedEvent
+			action do
+				updateLastPackageArrays(a.durationL1, a.durationL2)
+				'
+                if (initiationCount >= STORED_STEPS) {
+                    Signal L1Type = classifyPulse(' & a.durationL1 & ', L1s, STORED_STEPS);
+                    Signal L2Type = classifyPulse(' & a.durationL2 & ', L2s, STORED_STEPS);
+    
+                    SignalType signalType = identifySignal(L1Type, L2Type);
+                    
+                    if (calibrationStep % 4 == signalType) {
+                        calibrationStep++;
+                    } else {
+                        calibrationStep = 0;
+                    }
+                    
+                    if (calibrationStep == CALIBRATION_SAMPLES * 4 + 1) {'
+				Transitions!startTimeCalibrated()
+				'calibrationStartTime = ' & a.startTimeL1 & ' % (PERIOD * 4);
+                    }
+                    '
+				updateAngles(a.signal, 'signalType', a.startTimeL2 - a.startTimeL1, false)
+				AngleSender!allAngles('signalAngles[0]', 'signalAngles[1]', 'signalAngles[2]', 'signalAngles[3]')
+			'if (DEBUG && VERBOSE) {'
+				printAngleInformation(a.durationL1, a.durationL2)
+			'}
+                } else {
+                    initiationCount++;
+                }'
+			end
+			transition -> ArrivalTime
+			event Transitions?startTimeCalibrated
+		}
+		state ArrivalTime {
+			on entry StatusSender!status(13)
+			internal
+			event a : PackageReceiver?packageDetectedEvent
+			action do
+				'
+                // Handle first few pulses in signal that arrive "before" startTime (after foverflow)
+                uint32_t startTime = ' & a.startTimeL1 & ' < calibrationStartTime ? ' & a.startTimeL1 & ' += 4*PERIOD : ' & a.startTimeL1 & ';
+                
+                // Send event if one or more angles have not been read
+                uint32_t diff = startTime - lastStartTime;
+                if (!(MIN_PACKAGE_SEPARATION < diff && diff < MAX_PACKAGE_SEPARATION)) {
+                    printWhenZero = 4; // Wait until this angle-measurnment arrives next (in four itterations). '
+				StatusSender!status(1)
+			'}
+                lastStartTime = startTime;
+                
+                // Classify package
+                int val = ((startTime-calibrationStartTime + PERIOD/2) / PERIOD) % 4;
+                SignalType signalType = SignalType(val);
+        
+                // Handle timing drift (from teensy or Base Stations)
+                double n = (double) (startTime-calibrationStartTime)/(PERIOD);
+                double difference = n - (long)n;
+        
+                if (difference < TIME_DRIFT_CORRECTOIN_THRESHOLD) {
+                    calibrationStartTime += TIME_DRIFT_CORRECTOIN_CONSTANT;
+                } else if (1-TIME_DRIFT_CORRECTOIN_THRESHOLD < difference) {
+                    calibrationStartTime -= TIME_DRIFT_CORRECTOIN_CONSTANT;
+                } else {
+                    if (recalibrateCount++ > RECALIBRATE_SAMPLES) {'
+				Transitions!recalibrate()
+				StatusSender!status(11)
+			'} else {'
+				StatusSender!status(10)
+			'}
+                    return;
+                }
+                if (recalibrateCount != 0) recalibrateCount = 0;
+                '
+				updateAngles(a.signal, 'signalType', a.startTimeL2 - a.startTimeL1, true)
+			'if (printWhenZero == 0) {'
+				AngleSender!allAngles('signalAngles[0]', 'signalAngles[1]', 'signalAngles[2]', 'signalAngles[3]')
+			'} else {
+                    printWhenZero--;
+                } 
+                
+                if (DEBUG && VERBOSE) {'
+				printAngleInformation(a.durationL1, a.durationL2)
+			'}'
+			end
+			transition -> PulseWidths
+			event Transitions?recalibrate
+		}
+		internal
+		event OverflowNotifier?timerOverflow
+		action do
+		'calibrationStartTime = (calibrationStartTime + (PERIODS_PER_CLOCK+1) * PERIOD * 4) % (PERIOD * 4);
+            
+            if (DEBUG && !VERBOSE) {
+                Serial.print("\nTimer overflow occured. ");
+            }
+            
+            '
+		end
+	}
+}
+thing fragment eRunner {
+	message baseStationAngles(bh : Double, bv : Double, ch : Double, cv : Double)
+	message coordinates(x : Double, y : Double, z : Double, separation : Double)
+}
+thing Runner includes eRunner , StatusMessages @c_header "
+    #include <constants.h>
+    #include <calibration.hpp>
+" @c_global "
+    Pose bPose;
+    Pose cPose;
+" {
+	provided port Run {
+		sends coordinates receives baseStationAngles
+	}
+	provided port StatusSender {
+		sends status
+	}
+	statechart Running init Idle {
+		state Idle {
+			on entry do
+			end
+		}
+		internal
+		event a : Run?baseStationAngles
+		action do
+			'Vec p = positionFromAngles(' & a.bh & ',' & a.bv & ',' & a.ch & ',' & a.cv & ');'
+			Run!coordinates('p[0]', 'p[1]', 'p[2]', 'diststanceBetweenLines')
+			if ('diststanceBetweenLines > MAX_LINE_SEPARATION') StatusSender!status(0)
+		end
+	}
+}
+thing fragment eCalibration {
+	message calibrate()
+	message entrypoint()
+	message endcalibrate()
+	message errcalibrate()
+	message receiveAngles(bh : Double, bv : Double, ch : Double, cv : Double)
+	message receivecalibration(bx : Double, by : Double, bz : Double, brx : Double, bry : Double, brz : Double, cx : Double, cy : Double, cz : Double, crx : Double, cry : Double, crz : Double)
+	message calibrationfromserial()
+}
+thing fragment iCalibration {
+	message calibrating()
+	message calibrationComplete()
+	message calibrationFailed()
+}
+thing Calibrator includes iCalibration , eCalibration , StatusMessages @c_header "
+    #include <Timer.h>
+    #include <constants.h>
+    #include <calibration.hpp>
+" @c_global "
+    double angleValues[CALIBRATION_POINT_COLLECTION_COUNT][4] = {0};
+    int angleIndex = 0;
+    bool endCalibration = 0;
+    
+    uint8_t fourCounter = 0;
+" {
+	provided port calibrator {
+		sends endcalibrate sends errcalibrate sends calibrationfromserial receives calibrate receives entrypoint receives receiveAngles receives receivecalibration
+	}
+	provided port StatusSender {
+		sends status
+	}
+	internal port avt {
+		sends calibrating sends calibrationComplete sends calibrationFailed receives calibrating receives calibrationComplete receives calibrationFailed
+	}
+	function printAngles(bh : Double, bv : Double, ch : Double, cv : Double) do
+		'if (VERBOSE) Serial.print("\nF,");
+        else Serial.print("\nAverage Angles:\t");
+        
+        Serial.print(' & bh & ',6);
+        Serial.print(",");
+        Serial.print(' & bv & ',6);
+        Serial.print(",");
+        Serial.print(' & ch & ',6);
+        Serial.print(",");
+        Serial.print(' & cv & ',6);
+        Serial.print(",");'
+	end
+	function printVariation(bh : Double, bv : Double, ch : Double, cv : Double) do
+		'if (VERBOSE) Serial.print("\nG,");
+        else Serial.print("\nVariation Angles:\t");
+        
+        Serial.print(' & bh & ',6);
+        Serial.print(",");
+        Serial.print(' & bv & ',6);
+        Serial.print(",");
+        Serial.print(' & ch & ',6);
+        Serial.print(",");
+        Serial.print(' & cv & ',6);
+        Serial.print(",");'
+	end
+	function printCalibration() do
+	'
+	   if (VERBOSE) Serial.print("\nK,");
+	   else Serial.print("\nCalibration:\n\nPb:\t");
+	   
+	   Serial.print(",");
+       Serial.print(posePb.position.getX());
+       Serial.print(",");
+       Serial.print(posePb.position.getY());
+       Serial.print(",");
+       Serial.print(posePb.position.getZ());
+       Serial.print(",");
+       Serial.print(posePb.orientation.getX());
+       Serial.print(",");
+       Serial.print(posePb.orientation.getY());
+       Serial.print(",");
+       Serial.println(posePb.orientation.getZ());
+       Serial.print(",");
+
+       if (!VERBOSE) Serial.print("\nPc:\t");
+       
+       Serial.print(posePc.position.getX());
+       Serial.print(",");
+       Serial.print(posePc.position.getY());
+       Serial.print(",");
+       Serial.print(posePc.position.getZ());
+       Serial.print(",");
+       Serial.print(posePc.orientation.getX());
+       Serial.print(",");
+       Serial.print(posePc.orientation.getY());
+       Serial.print(",");
+       Serial.println(posePc.orientation.getZ());
+       Serial.print(",");
+       
+       if (!VERBOSE) Serial.print("\n Point 4 error:\t");
+       
+       Serial.print(pointError);
+	   Serial.print(",");
+	   
+	   if (!VERBOSE) Serial.print("\n");
+	   '
+	end
+	statechart Calibrator init Idle {
+		on entry do
+		end
+		state Idle {
+			transition calibrate -> Calibrate
+			event m : calibrator?calibrate
+		}
+		state Calibrate {
+			on entry do
+				if ('endCalibration') do
+					if ('calibrationFailed') do
+						StatusSender!status(7)
+						avt!calibrationFailed()
+					end
+					else do
+						StatusSender!status(4)
+						if ('DEBUG') printCalibration()
+						avt!calibrationComplete()
+					end
+				'
+                    endCalibration = 0;
+                    calibrationFailed = false;
+                    '
+				end
+			end
+			transition -> PointCollect
+			event calibrator?entrypoint
+			transition -> Idle
+			event avt?calibrationComplete
+			action calibrator!endcalibrate()
+			transition -> Idle
+			event avt?calibrationFailed
+			action calibrator!errcalibrate()
+			transition -> Calibrate
+			event calibrator?calibrate
+			action 'restartCalibration();'
+		}
+		state PointCollect {
+			on entry do
+			'angleIndex = 0;'
+				StatusSender!status(2)
+			end
+			internal
+			event angles : calibrator?receiveAngles
+			action do
+				'
+                // Only collect data-points whena all have been refreshed
+                if (++fourCounter == 4) {
+                    fourCounter = 0;
+                    
+                    angleValues[angleIndex][0] = ' & angles.bh & ';
+                    angleValues[angleIndex][1] = ' & angles.bv & ';
+                    angleValues[angleIndex][2] = ' & angles.ch & ';
+                    angleValues[angleIndex][3] = ' & angles.cv & ';
+                    angleIndex++;
+                }
+                
+                if (angleIndex == CALIBRATION_POINT_COLLECTION_COUNT) {
+                    angleIndex = 0;'
+				avt!calibrating()
+			'}'
+			end
+			transition -> Calibrate
+			event calibrator?calibrate
+			action 'restartCalibration();'
+			transition -> Calibrate
+			event avt?calibrating
+			action do
+			'
+                double largest[4] = {angleValues[0][0], angleValues[0][1], angleValues[0][2], angleValues[0][3]};
+                double smallest[4] = {angleValues[0][0], angleValues[0][1], angleValues[0][2], angleValues[0][3]};
+                double sum[4] = {0};
+                
+                for (int i = 0; i < CALIBRATION_POINT_COLLECTION_COUNT; i++) {
+                    for (int j = 0; j <  4; j++) {
+                        if (largest[j] < angleValues[i][j]) largest[j] = angleValues[i][j];
+                        if (smallest[j] > angleValues[i][j]) smallest[j] = angleValues[i][j];
+                        sum[j] += angleValues[i][j];
+                    }
+                }
+                
+                double average[4] = {0};
+                bool ok = true;
+                
+                for (int j = 0; j <  4; j++) {
+                    if (largest[j] - smallest[j] > LARGEST_ANGLE_DEVIATION_FOR_SINGLE_MEASURNMENT) {'
+			'ok = false;
+                    }
+                    average[j] = sum[j]/CALIBRATION_POINT_COLLECTION_COUNT;
+                } 
+                
+                if (ok) {
+                    '
+				StatusSender!status(8)
+			'
+                    
+                    STOP = true;
+                    endCalibration = collectAnglesForPoint(average[0], average[1], average[2], average[3]);
+                    STOP = false;
+                    '
+				if ('DEBUG') printAngles('average[0]', 'average[1]', 'average[2]', 'average[3]')
+			'} else {'
+				StatusSender!status(9)
+			'}'
+				if ('DEBUG') printVariation('largest[0]-smallest[0]', 'largest[1]-smallest[1]', 'largest[2]-smallest[2]', 'largest[3]-smallest[3]')
+			end
+		}
+	}
+}
+datatype Char<1>
+	@type_checker "Integer"
+	@c_type "char"
+	@c_byte_size "1"
+object String
+	@type_checker "String"
+	@c_type "char *"
+	@c_byte_size "2"
+datatype Boolean<1>
+	@type_checker "Boolean"
+	@c_type "uint8_t"
+	@c_byte_size "1"
+datatype UInt8<1>
+	@type_checker "Integer"
+	@c_type "uint8_t"
+	@c_byte_size "1"
+datatype UInt16<2>
+	@type_checker "Integer"
+	@c_type "uint16_t"
+	@c_byte_size "2"
+	@java_type "int"
+	@java_primitive "true"
+datatype Int16<2>
+	@type_checker "Integer"
+	@c_type "int16_t"
+	@c_byte_size "2"
+datatype UInt32<4>
+	@type_checker "Integer"
+	@c_type "uint32_t"
+	@c_byte_size "4"
+datatype Integer<2>
+	@type_checker "Integer"
+	@c_type "int16_t"
+	@c_byte_size "2"
+datatype Long<4>
+	@type_checker "Integer"
+	@c_type "long"
+	@c_byte_size "4"
+datatype Float<4>
+	@type_checker "Real"
+	@c_type "float"
+	@c_byte_size "4"
+datatype Double<8>
+	@type_checker "Real"
+	@c_type "double"
+	@c_byte_size "8"
+enumeration DigitalState
+	@c_byte_size "1"
+	@c_type "uint8_t"
+	{
+	LOW @enum_val "0"
+	HIGH @enum_val "1"
+}
+datatype Byte<1>
+	@type_checker "Integer"
+	@c_type "uint8_t"
+	@c_byte_size "1"
+	@java_type "byte"
+	@java_primitive "true"
+	@scala_type "Byte"
+	@SenML_type "Double"
+enumeration DigitalState
+	@c_type "uint8_t"
+	@c_byte_size "1"
+	{
+	LOW @enum_val "0"
+	HIGH @enum_val "1"
+}
+thing fragment msgout {
+	message printStatus(id : UInt8, verbose : Boolean)
+	message printOperationState(id : UInt8, verbose : Boolean)
+	message printPoint(x : Double, y : Double, z : Double, separation : Double, verbose : Boolean)
+}
+thing fragment msgin {
+	message waitcalibration()
+	message calibrationreceived(bx : Double, by : Double, bz : Double, brx : Double, bry : Double, brz : Double, cx : Double, cy : Double, cz : Double, crx : Double, cry : Double, crz : Double)
+}
+thing fragment iserialin {
+	message serial_timeout()
+}
+thing fragment eblinker {
+	message statusID(id : UInt8)
+	message stateID(id : UInt8)
+}
+thing fragment iSoftButton {
+	message timer_timeout()
+}
+thing fragment SoftButtonMsgs {
+	message click()
+	message double_click()
+	message long_press()
+}
+thing SerialOut includes msgout {
+	provided port basic {
+		receives printStatus receives printOperationState receives printPoint
+	}
+	statechart Message init Idle {
+		on entry do
+		'Serial.begin(115200);'
+		end
+		state Idle {
+			internal
+			event m : basic?printStatus
+			action do
+				if (m.verbose) do
+					'
+                    Serial.print("\nH,");
+                    Serial.print(' & m.id & ');
+                    Serial.print(",");
+                '
+				end
+				else do
+					'
+		            Serial.print("\nStatus:\t");
+		            Serial.print(' & m.id & ');
+		        '
+				end
+			end
+			internal
+			event m : basic?printOperationState
+			action do
+				if (m.verbose) do
+					'
+                    Serial.print("\nI,");
+                    Serial.print(' & m.id & ');
+                    Serial.print(",");
+                '
+				end
+				else do
+					'
+                    Serial.print("\nState:\t");
+                    Serial.print(' & m.id & ');
+                '
+				end
+			end
+			internal
+			event m : basic?printPoint
+			action do
+				if (m.verbose) do
+					'
+    		        Serial.print("\nJ,");
+    		        Serial.print(' & m.x & ',3);
+    		        Serial.print(",");
+    		        Serial.print(' & m.y & ',3);
+    		        Serial.print(",");
+    		        Serial.print(' & m.z & ',3);
+    		        Serial.print(",");
+    		        Serial.print(' & m.separation & ',4);
+                    Serial.print(",");
+    		    '
+				end
+				else do
+					'
+                    Serial.print("\nPoint:\t");
+                    Serial.print(' & m.x & ',3);
+                    Serial.print(",\t");
+                    Serial.print(' & m.y & ',3);
+                    Serial.print(",\t");
+                    Serial.print(' & m.z & ',3);
+                    Serial.print(",\t"); 
+                    Serial.print(' & m.separation & ',4);
+    		    '
+				end
+			end
+		}
+	}
+}
+thing SerialIn includes msgin , iserialin @c_header "#include <Timer.h>
+#include <constants.h>" @c_global "extern struct SerialIn_Instance serialIn_var;" {
+	provided port serialcall {
+		sends calibrationreceived receives waitcalibration
+	}
+	internal port Timer {
+		sends serial_timeout receives serial_timeout
+	}
+	function timeout_serialreader() @c_prototype "void timeout_serialreader()" do
+	'SerialIn_send_Timer_serial_timeout(&serialIn_var);'
+	end
+	statechart serialreader init Idle {
+		state Idle {
+			transition -> CalibrationReceiver
+			event serialcall?waitcalibration
+		}
+		state CalibrationReceiver {
+			on entry 'start_timer(2, 25, &timeout_serialreader);'
+			transition -> Idle
+			event Timer?serial_timeout
+			guard 'Serial.available()'
+			action do
+			'
+																udouble ud ;
+																for(int i = 0; i < 96; i++){
+																		ud.b[i] = Serial.read();
+																 }'
+				serialcall!calibrationreceived('ud.d[0]', 'ud.d[1]', 'ud.d[2]', 'ud.d[3]', 'ud.d[4]', 'ud.d[5]', 'ud.d[6]', 'ud.d[7]', 'ud.d[8]', 'ud.d[9]', 'ud.d[10]', 'ud.d[11]')
+			end
+		}
+	}
+}
+thing SoftButton includes ButtonMsgs , iSoftButton , SoftButtonMsgs @c_header "#include <Timer.h>" @c_global "extern struct SoftButton_Instance softButton_var;" {
+	required port Button {
+		receives press receives release
+	}
+	internal port Timer {
+		sends timer_timeout receives timer_timeout
+	}
+	provided port SoftButton {
+		sends click sends double_click sends long_press
+	}
+	readonly property long_delay : UInt16 = 1000
+	readonly property double_delay : UInt16 = 250
+	function timeout_button() @c_prototype "void timeout_button()" do
+	'SoftButton_send_Timer_timer_timeout(&softButton_var);'
+	end
+	statechart SoftButtonImpl init Idle {
+		state Idle {
+			transition pressed -> Pressed
+			event m : Button?press
+		}
+		state Pressed {
+			on entry 'start_timer(1, ' & long_delay & ', &timeout_button);'
+			on exit 'timer_cancel(1);'
+			transition long -> Idle
+			event Timer?timer_timeout
+			action SoftButton!long_press()
+			transition click -> Released
+			event Button?release
+		}
+		state Released {
+			on entry 'start_timer(1, ' & double_delay & ', &timeout_button);'
+			on exit 'timer_cancel(1);'
+			transition click -> Idle
+			event Timer?timer_timeout
+			action SoftButton!click()
+			transition double -> Idle
+			event Button?press
+			action SoftButton!double_click()
+		}
+	}
+}
+thing Blinker includes eblinker @c_header "
+#include <Timer.h>
+#include <Adafruit_NeoPixel.h>
+#include <Color_Helper.h>
+" @c_global "
+extern struct Blinker_Instance blinker_var;
+boolean current_blink = HIGH;
+
+#define PIN 8
+#define NUM_LEDS 1
+#define BRIGHTNESS 50
+
+uint32_t returnColor = RED;
+bool timeout = false;
+int8_t timeoutPriority = 0;
+
+Adafruit_NeoPixel led = Adafruit_NeoPixel(NUM_LEDS, PIN, NEO_GRBW + NEO_KHZ800);
+" {
+	message blink()
+	internal port evt {
+		sends blink receives blink
+	}
+	provided port neopixel {
+		receives stateID receives statusID
+	}
+	function startLEDFlashAfterDuration(duration : UInt32) do
+		'start_timer(5, ' & duration & ', &callback_message_flash);'
+	end
+	function callback_message_flash() @c_prototype "void callback_message_flash()" do
+	'
+        Blinker_send_evt_blink(&blinker_var);
+        start_timer(5, 100, &callback_message_flash);
+        '
+	end
+	function setColorForDuration(color : UInt32, duration : UInt32) do
+		'led.setPixelColor(0, ' & color & ');
+        led.show();'
+		'start_timer(6, ' & duration & ', &callback_message_neopixel);'
+	end
+	function callback_message_neopixel() @c_prototype "void callback_message_neopixel()" do
+	'
+        led.setPixelColor(0, returnColor);
+        led.show();
+        '
+	end
+	function timeoutColorChangeForDuration(duration : UInt32) do
+	'timeout = true;'
+		'start_timer(7, ' & duration & ', &callback_message_timeout);'
+	end
+	function callback_message_timeout() @c_prototype "void callback_message_timeout()" do
+	'timeout = false;'
+	end
+	statechart BlinkerState init Idle {
+		on entry do
+		'pinMode(13, OUTPUT);
+    				 led.setBrightness(BRIGHTNESS);
+					 led.begin();
+					 led.show();
+    				 '
+			startLEDFlashAfterDuration(1000)
+		end
+		state Idle {
+			on entry do
+			end
+		}
+		internal
+		event m : evt?blink
+		action do
+		'
+		    digitalWriteFast(13, current_blink);
+    		current_blink = (current_blink == HIGH)? LOW : HIGH;
+    	    '
+		end
+		internal
+		event m : neopixel?stateID
+		action do
+			'
+
+    		switch(' & m.id & ') {
+    		    case 1: returnColor  = ORANGE; break; // LoadCalibration
+    		    case 2: returnColor  = WHITE; break;  // Calibration
+    		    case 3: returnColor  = ORANGE; break; // Validate_Calibration
+    		    case 4: returnColor  = GREEN;  break; // Runner
+    		    default: returnColor = BLACK;
+    		}
+
+    		if (!timeout) {
+    		    led.setPixelColor(0, returnColor);
+    		    led.show();
+    		    '
+			timeoutColorChangeForDuration(1000)
+		'
+    		}
+      		'
+		end
+		internal
+		event m : neopixel?statusID
+		action do
+			'
+
+    		uint32_t flashColor;
+    		int8_t priority;
+
+    		switch(' & m.id & ') {
+    			case 0:  flashColor = RED;           priority = 1; break;
+    			case 1:  flashColor = BLUE;          priority = 0; break;
+    			case 2:  flashColor = LIME;          priority = 1; break;
+    			case 3:  flashColor = LAVENDER;      priority =-1; break;
+    			case 4:  flashColor = DARK_GREEN;    priority = 4; break;
+    			case 5:  flashColor = DARK_GREEN;    priority = 3; break;
+    			case 6:  flashColor = DARK_RED;      priority = 3; break;
+    			case 7:  flashColor = DARK_RED;      priority = 4; break;
+    			case 8:  flashColor = GREEN;         priority = 2; break;
+    			case 9:  flashColor = RED;           priority = 2; break;
+    			case 10: flashColor = YELLOW;        priority = 0; break;
+    			case 11: flashColor = BROWN;         priority = 1; break;
+    			case 12: flashColor = CIAN;          priority = 0; break;
+    			case 13: flashColor = DARK_GREEN;    priority = 0; break;
+    			case 14: flashColor = PURPLE;        priority =-1; break;
+    			case 15: flashColor = GREY;          priority = 0; break;
+    			default: flashColor = BLACK;         priority = 0;
+        	}
+        	if (!timeout || priority > timeoutPriority) {
+        	    timeoutPriority = priority;
+        	    uint16_t duration = priority > 0 ? 600 : 100;'
+			setColorForDuration('flashColor', 'duration+100')
+			timeoutColorChangeForDuration('duration')
+		'}'
+		end
+	}
+}
+thing fragment eCalibrationStorer {
+	message load()
+	message endload()
+	message errorload()
+	message save()
+}
+thing CalibrationStorer includes StoreMessages , eCalibrationStorer @c_header "
+    #import <calibration.hpp>
+" @c_global "
+    #define STORE_KEY 42
+" {
+	message storerToIdle()
+	required port storeReader {
+		sends readByte sends readConfig receives byteRead receives configRead
+	}
+	required port storeWriter {
+		sends writeByte sends writeConfig receives byteWritten receives configWritten
+	}
+	provided port storer {
+		sends endload sends errorload receives load receives save
+	}
+	internal port progress {
+		sends storerToIdle receives storerToIdle
+	}
+	statechart Loader init Idle {
+		state Idle {
+			transition -> Load
+			event storer?load
+			transition -> Save
+			event storer?save
+		}
+		state Load {
+			on entry do
+				storeReader!readByte(0)
+			end
+			internal
+			event m : storeReader?byteRead
+			action do
+				if (m.val == 'STORE_KEY') storeReader!readConfig()
+				else do
+					storer!errorload()
+					progress!storerToIdle()
+				end
+			end
+			transition -> Idle
+			event m : storeReader?configRead
+			action do
+				'
+                posePb = Pose({' & m.bx & ', ' & m.by & ', ' & m.bz & '}, {' & m.brx & ', ' & m.bry & ', ' & m.brz & '});
+                posePc = Pose({' & m.cx & ', ' & m.cy & ', ' & m.cz & '}, {' & m.crx & ', ' & m.cry & ', ' & m.crz & '});
+			    pointError = 0;
+			    calibrationFailed = false;
+			    '
+				storer!endload()
+			end
+			transition -> Idle
+			event progress?storerToIdle
+		}
+		state Save {
+			on entry do
+				storeWriter!writeByte(0, 'STORE_KEY')
+				storeWriter!writeConfig('posePb.position.getX()', 'posePb.position.getY()', 'posePb.position.getZ()', 'posePb.orientation.getX()', 'posePb.orientation.getY()', 'posePb.orientation.getZ()', 'posePc.position.getX()', 'posePc.position.getY()', 'posePc.position.getZ()', 'posePc.orientation.getX()', 'posePc.orientation.getY()', 'posePc.orientation.getZ()')
+			end
+			transition -> Idle
+			event storeWriter?configWritten
+		}
+	}
+}
+thing fragment eCalibrationValidator {
+	message validate()
+	message endvalidate()
+	message errvalidate()
+}
+thing CalibrationValidator includes eCalibrationValidator {
+	message validating()
+	provided port validator {
+		sends endvalidate sends errvalidate receives validate
+	}
+	internal port avt {
+		sends validating receives validating
+	}
+	statechart Validator init Idle {
+		state Idle {
+			transition load -> Idle
+			event m : validator?validate
+			action validator!endvalidate()
+		}
+	}
+}
+thing fragment IRMessages {
+	message pulseDetectedEvent(start : UInt32, duration : UInt32)
+	message packageDetectedEvent(startTimeL1 : UInt32, startTimeL2 : UInt32, durationL1 : UInt32, durationL2 : UInt32, signal : UInt32)
+	message allAngles(bh : Double, bv : Double, ch : Double, cv : Double)
+	message timerOverflow()
+}
+thing fragment StatusMessages {
+	message status(id : UInt8)
+	message currentState(id : UInt8)
+	message startPrinting()
+	message stopPrinting()
+}
+thing fragment ButtonMsgs {
+	message press()
+	message release()
+}
+thing fragment TimerMessages {
+	message ms25_tic()
+}
+thing Button includes ButtonMsgs , TimerMessages @c_header "#include <Timer.h>" @c_global "extern struct Button_Instance button_var;" {
+	internal port clock {
+		sends ms25_tic receives ms25_tic
+	}
+	provided port evt {
+		sends press sends release
+	}
+	property PIN : UInt8 = 7
+	function is_pressed() : Boolean do
+		return '1 - digitalRead(' & PIN & ')'
+	end
+	function time_25ms() @c_prototype "void time_25ms()" do
+	'Button_send_clock_ms25_tic(&button_var);'
+	'start_timer(0, 25, &time_25ms);'
+	end
+	statechart Button init RELEASED {
+		on entry do
+			'pinMode(' & PIN & ', INPUT_PULLUP);
+			initialize_timer();
+			start_timer(0, 125, &time_25ms);'
+		end
+		state RELEASED {
+			transition status -> PRESSED
+			event clock?ms25_tic
+			guard is_pressed()
+			action evt!press()
+		}
+		state PRESSED {
+			transition status -> RELEASED
+			event clock?ms25_tic
+			guard not is_pressed()
+			action evt!release()
+		}
+	}
+}
+thing fragment StoreMessages {
+	message readByte(id : UInt8)
+	message readConfig()
+	message byteRead(val : UInt8)
+	message configRead(bx : Double, by : Double, bz : Double, brx : Double, bry : Double, brz : Double, cx : Double, cy : Double, cz : Double, crx : Double, cry : Double, crz : Double)
+	message writeByte(id : UInt8, val : UInt8)
+	message writeConfig(bx : Double, by : Double, bz : Double, brx : Double, bry : Double, brz : Double, cx : Double, cy : Double, cz : Double, crx : Double, cry : Double, crz : Double)
+	message byteWritten()
+	message configWritten()
+}
+thing Storer includes StoreMessages @c_header "
+    #include <constants.h>
+    
+#include <inttypes.h>
+#include <avr/eeprom.h>
+#include <avr/io.h>
+" {
+	provided port reader {
+		sends byteRead sends configRead receives readByte receives readConfig
+	}
+	provided port writer {
+		sends byteWritten sends configWritten receives writeByte receives writeConfig
+	}
+	statechart EESave init Idle {
+		state Idle {
+			internal
+			event m : reader?readByte
+			action do
+				reader!byteRead('eeprom_read_byte((uint8_t*) ' & m.id & ')')
+			end
+			internal
+			event m : reader?readConfig
+			action do
+			'
+    			udouble ud; 
+    			for (int i = 0; i < 96; i++) {
+    				ud.b[i] = eeprom_read_byte((uint8_t*) i+1);
+    			}'
+				reader!configRead('ud.d[0]', 'ud.d[1]', 'ud.d[2]', 'ud.d[3]', 'ud.d[4]', 'ud.d[5]', 'ud.d[6]', 'ud.d[7]', 'ud.d[8]', 'ud.d[9]', 'ud.d[10]', 'ud.d[11]')
+			end
+			internal
+			event m : writer?writeByte
+			action do
+				'
+        		if(' & m.val & ' != eeprom_read_byte((uint8_t*) ' & m.id & '))	eeprom_write_byte((uint8_t*) ' & m.id & ',' & m.val & ');'
+				writer!byteWritten()
+			end
+			internal
+			event m : writer?writeConfig
+			action do
+				'
+			
+			    udouble data;
+			    data.d[0] = ' & m.bx & ';
+			    data.d[1] = ' & m.by & ';
+			    data.d[2] = ' & m.bz & ';
+			    data.d[3] = ' & m.brx & ';
+			    data.d[4] = ' & m.bry & ';
+			    data.d[5] = ' & m.brz & ';
+			    data.d[6] = ' & m.cx & ';
+			    data.d[7] = ' & m.cy & ';
+			    data.d[8] = ' & m.cz & ';
+			    data.d[9] = ' & m.crx & ';
+			    data.d[10] = ' & m.cry & ';
+			    data.d[11] = ' & m.crz & ';
+			    			    
+			    for (int i = 0; i < 96; i++) {
+                    if(data.b[i] != eeprom_read_byte((uint8_t*) i+1))	eeprom_write_byte((uint8_t*) i+1, data.b[i]);
+                }'
+				writer!configWritten()
+			end
+		}
+	}
+}
+configuration Teensy_IRPS @teensy_corepath "../../../../c/lib/core/teensy3" @teensy_externpath "../../../../c/utils" @teensy_libpath "../../../../c/lib/Adafruit_NeoPixel" @teensy_fifosize "512" {
+	instance button : Button
+	instance softButton : SoftButton
+	instance blinker : Blinker
+	instance serial : SerialOut
+	instance serialIn : SerialIn
+	instance pulseReader : PulseReader
+	instance packageReader : PackageReader
+	instance angleReader : AngleReader
+	instance backbone : Backbone
+	instance runner : Runner
+	instance calibrator : Calibrator
+	instance calibrationStorer : CalibrationStorer
+	instance storer : Storer
+	instance calibrationValidator : CalibrationValidator
+	connector softButton.Button => button . evt
+	connector backbone.presser => softButton . SoftButton
+	connector backbone.printer => serial . basic
+	connector backbone.serialRead => serialIn . serialcall
+	connector backbone.StatusHandler => packageReader . StatusSender
+	connector backbone.StatusHandler => angleReader . StatusSender
+	connector backbone.StatusHandler => calibrator . StatusSender
+	connector backbone.StatusHandler => runner . StatusSender
+	connector backbone.pixel => blinker . neopixel
+	connector pulseReader.PulseSender => packageReader . PulseReceiver
+	connector packageReader.PackageSender => angleReader . PackageReceiver
+	connector backbone.AngleReceiver => angleReader . AngleSender
+	connector pulseReader.OverflowNotifier => angleReader . OverflowNotifier
+	connector backbone.Run => runner . Run
+	connector backbone.calibrator => calibrator . calibrator
+	connector backbone.CalibrationStorer => calibrationStorer . storer
+	connector calibrationStorer.storeWriter => storer . writer
+	connector calibrationStorer.storeReader => storer . reader
+	connector backbone.validator => calibrationValidator . validator
+}

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="582px" height="323px" viewBox="0 0 582 323" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="background: #FFFFFF;">
+    <!-- Generator: Sketch 44.1 (41455) - http://www.bohemiancoding.com/sketch -->
+    <title>Setup</title>
+    <desc>Created with Sketch.</desc>
+    <defs></defs>
+    <g id="Setup" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g>
+            <g id="Group" transform="translate(508.000000, 34.000000)" stroke="#979797" stroke-linecap="square">
+                <path d="M5.5,2.5 L5.5,190.5" id="Line"></path>
+                <path d="M0,190.5 L10,190.5" id="Line"></path>
+                <path d="M0,1.5 L10,1.5" id="Line"></path>
+                <path d="M0,96.5 L10,96.5" id="Line"></path>
+            </g>
+            <text id="350-mm" font-family="Helvetica" font-size="13" font-weight="normal" fill="#232323">
+                <tspan x="518.02002" y="183">350 mm</tspan>
+            </text>
+            <text id="350-mm" font-family="Helvetica" font-size="13" font-weight="normal" fill="#232323">
+                <tspan x="518.02002" y="89">350 mm</tspan>
+            </text>
+            <text id="θ" font-family="Helvetica" font-size="20" font-weight="normal" fill="#232323">
+                <tspan x="383.673654" y="151">θ</tspan>
+            </text>
+            <text id="x" font-family="Helvetica" font-size="20" font-weight="normal" fill="#232323">
+                <tspan x="19" y="216">x</tspan>
+            </text>
+            <path d="M41.5,288.5 L456.5,218.5" id="Line" stroke="#979797" stroke-linecap="square"></path>
+            <path d="M40.5,288.5 L456.5,47.5" id="Line" stroke="#979797" stroke-linecap="square"></path>
+            <path d="M405.5,46.5 L457.5,46.5" id="Line" stroke="#979797" stroke-linecap="square"></path>
+            <path d="M404.5,217.5 L456.5,217.5" id="Line" stroke="#979797" stroke-linecap="square"></path>
+            <path d="M425.8125,46.9414062 C425.8125,52.9637706 427.999027,59.030883 430.231867,62.526903" id="Path-2" stroke="#979797"></path>
+            <path d="M403,132 C403,139.341757 405.186527,146.738065 407.419367,151" id="Path-2" stroke="#979797"></path>
+            <path d="M423.602817,217 C423.602817,219.511654 424.224004,222.140344 424.719741,223.643111" id="Path-2" stroke="#979797"></path>
+            <polygon id="Path-3" stroke="#222222" points="40.5348812 132 457.16007 132.197995 40 288.888641"></polygon>
+            <text id="ɸb" font-family="Helvetica" font-size="20" font-weight="normal" fill="#232323">
+                <tspan x="399.941406" y="66">ɸ</tspan>
+                <tspan x="414.384766" y="66" font-size="12">b</tspan>
+            </text>
+            <text id="ɸc" font-family="Helvetica" font-size="20" font-weight="normal" fill="#232323">
+                <tspan x="410.27832" y="211">ɸ</tspan>
+                <tspan x="424.72168" y="211" font-size="12">c</tspan>
+            </text>
+            <path d="M456.5,24 L456.5,58 L471,58 C475.142136,58 478.5,54.6421356 478.5,50.5 L478.5,31.5 C478.5,27.3578644 475.142136,24 471,24 L456.5,24 Z" id="Rectangle" stroke="#222222" transform="translate(467.500000, 41.000000) rotate(-20.000000) translate(-467.500000, -41.000000) "></path>
+            <path d="M456.5,204 L456.5,238 L471,238 C475.142136,238 478.5,234.642136 478.5,230.5 L478.5,211.5 C478.5,207.357864 475.142136,204 471,204 L456.5,204 Z" id="Rectangle" stroke="#000000" transform="translate(467.500000, 221.000000) rotate(20.000000) translate(-467.500000, -221.000000) "></path>
+            <text id="b" font-family="Helvetica" font-size="20" font-weight="normal" fill="#232323">
+                <tspan x="462.438477" y="49">b</tspan>
+            </text>
+            <text id="c" font-family="Helvetica" font-size="20" font-weight="normal" fill="#232323">
+                <tspan x="462" y="227">c</tspan>
+            </text>
+            <text id="1655-mm" font-family="Helvetica" font-size="13" font-weight="normal" fill="#232323">
+                <tspan x="214.405029" y="127">1655 mm</tspan>
+            </text>
+            <circle id="Oval" stroke="#222222" fill="#D8D8D8" cx="40" cy="289" r="7"></circle>
+            <text id="master" font-family="Helvetica" font-size="13" font-weight="normal" fill="#232323">
+                <tspan x="447.13501" y="17">master</tspan>
+            </text>
+            <text id="slave" font-family="Helvetica" font-size="13" font-weight="normal" fill="#232323">
+                <tspan x="451.325928" y="196">slave</tspan>
+            </text>
+            <text id="sensor" font-family="Helvetica" font-size="13" font-weight="normal" fill="#232323">
+                <tspan x="21.4904785" y="309">sensor</tspan>
+            </text>
+        </g>
+    </g>
+</svg>

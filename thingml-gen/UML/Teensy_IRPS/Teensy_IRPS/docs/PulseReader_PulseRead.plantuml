@@ -1,0 +1,12 @@
+@startuml
+skinparam defaultTextAlignment left
+caption Behavior of thing PulseReader
+[*] --> PulseRead
+state PulseRead{
+state Idle{
+	Idle : m:Transitions?pulseDetected / \naction PulseSender!pulseDetectedEvent(...)\n
+}
+[*] --> Idle
+	PulseRead : entry / 'initialize_();'\n
+}
+@enduml

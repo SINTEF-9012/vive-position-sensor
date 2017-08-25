@@ -1,0 +1,46 @@
+/*
+ * File for validating calibration. Currently all calibrations pass and validation is left to live checks. 
+ */
+
+import "../_Datatypes.thingml"
+
+thing fragment eCalibrationValidator
+{
+	message validate()
+	message endvalidate()
+	message errvalidate()
+}
+
+thing CalibrationValidator includes eCalibrationValidator
+{
+	provided port validator {
+		receives validate
+		sends endvalidate, errvalidate
+	}
+	
+	
+	message validating()
+	
+	internal port avt
+	{
+		sends validating
+		receives validating
+	}
+	
+	statechart Validator init Idle
+	{
+		state Idle {
+			transition load -> Idle event m: validator?validate action validator!endvalidate()
+		}
+	
+		/*
+		state Load {
+			on entry do
+				avt!validating()
+			end
+			transition idle -> Idle event m: avt?validating action calibvalidator!endvalidate()
+		}
+		*/
+		
+	}
+}

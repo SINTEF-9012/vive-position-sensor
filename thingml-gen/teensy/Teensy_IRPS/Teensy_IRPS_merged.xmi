@@ -1,0 +1,1775 @@
+<?xml version="1.0" encoding="ASCII"?>
+<thingML:ThingMLModel xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:thingML="http://www.thingml.org/xtext/ThingML">
+  <types xsi:type="thingML:Thing" name="OutputMessage" fragment="true">
+    <messages name="positionCoordinates">
+      <parameters name="x">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="y">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="z">
+        <typeRef type="//@types.20"/>
+      </parameters>
+    </messages>
+  </types>
+  <types xsi:type="thingML:Thing" name="Backbone" includes="//@types.24 //@types.25 //@types.34 //@types.36 //@types.7 //@types.29 //@types.39 //@types.38 //@types.5 //@types.27 //@types.0">
+    <annotations name="c_header" value="&#xA;        #include &lt;Timer.h>&#xA;        #include &lt;constants.h>&#xA;    "/>
+    <annotations name="c_global" value="&#xA;        extern struct Backbone_Instance backbone_var; // for timeout_angleStatus() function&#xA;   &#xA;        bool angleReadingArrived = false; // For alerting user is no angles are received over longer period&#xA;        &#xA;        // Globally available debug flags (extern in constants.h)        &#xA;        bool DEBUG = false;&#xA;        bool VERBOSE = false;&#xA;    "/>
+    <messages name="toIdle"/>
+    <ports xsi:type="thingML:ProvidedPort" name="Output" sends="//@types.0/@messages.0"/>
+    <ports xsi:type="thingML:RequiredPort" name="AngleReceiver" receives="//@types.38/@messages.2"/>
+    <ports xsi:type="thingML:RequiredPort" name="Run" sends="//@types.5/@messages.0" receives="//@types.5/@messages.1"/>
+    <ports xsi:type="thingML:RequiredPort" name="CalibrationStorer" sends="//@types.34/@messages.0 //@types.34/@messages.3" receives="//@types.34/@messages.1 //@types.34/@messages.2"/>
+    <ports xsi:type="thingML:RequiredPort" name="validator" sends="//@types.36/@messages.0" receives="//@types.36/@messages.1 //@types.36/@messages.2"/>
+    <ports xsi:type="thingML:RequiredPort" name="calibrator" sends="//@types.7/@messages.0 //@types.7/@messages.1 //@types.7/@messages.4 //@types.7/@messages.5" receives="//@types.7/@messages.2 //@types.7/@messages.3 //@types.7/@messages.6"/>
+    <ports xsi:type="thingML:RequiredPort" name="printer" sends="//@types.24/@messages.0 //@types.24/@messages.1 //@types.24/@messages.2"/>
+    <ports xsi:type="thingML:RequiredPort" name="serialRead" sends="//@types.25/@messages.0" receives="//@types.25/@messages.1"/>
+    <ports xsi:type="thingML:RequiredPort" name="pixel" sends="//@types.27/@messages.1 //@types.27/@messages.0"/>
+    <ports xsi:type="thingML:RequiredPort" name="presser" receives="//@types.29/@messages.0 //@types.29/@messages.1 //@types.29/@messages.2"/>
+    <ports xsi:type="thingML:RequiredPort" name="StatusHandler" receives="//@types.39/@messages.0"/>
+    <ports xsi:type="thingML:InternalPort" name="StateHandler" sends="//@types.39/@messages.1" receives="//@types.39/@messages.1"/>
+    <ports xsi:type="thingML:InternalPort" name="transitions" sends="//@types.1/@messages.0" receives="//@types.1/@messages.0"/>
+    <functions name="sendStatus">
+      <parameters name="id">
+        <typeRef type="//@types.13"/>
+      </parameters>
+      <body xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:SendAction" port="//@types.1/@ports.8" message="//@types.27/@messages.0">
+          <parameters xsi:type="thingML:PropertyReference" property="//@types.1/@functions.0/@parameters.0"/>
+        </actions>
+        <actions xsi:type="thingML:ExternStatement" statement="if (DEBUG)"/>
+        <actions xsi:type="thingML:SendAction" port="//@types.1/@ports.6" message="//@types.24/@messages.0">
+          <parameters xsi:type="thingML:PropertyReference" property="//@types.1/@functions.0/@parameters.0"/>
+          <parameters xsi:type="thingML:ExternExpression" expression="VERBOSE"/>
+        </actions>
+      </body>
+    </functions>
+    <functions name="timeout_angleStatus">
+      <annotations name="c_prototype" value="void timeout_angleStatus()"/>
+      <body xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="if (angleReadingArrived) {&#xA;             angleReadingArrived = false;&#xA;         } else {&#xA;             f_Backbone_sendStatus(&amp;backbone_var, 14);&#xA;         }&#xA;         start_timer(4, NO_PACKAGES_TO_ERROR_DISPLAY_DURATION, &amp;timeout_angleStatus);&#xA;         "/>
+      </body>
+    </functions>
+    <behaviour name="Main" initial="//@types.1/@behaviour.0/@substate.0">
+      <entry xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="&#xA;&#x9;&#x9;    timeout_angleStatus(); // Start monitoring for durations of no signals&#xA;&#x9;&#x9;    &#xA;&#x9;&#x9;    pinMode(12, OUTPUT);&#xA;            digitalWriteFast(12, HIGH);&#xA;            pinMode(11, INPUT);&#xA;            DEBUG = !digitalRead(11);&#xA;            "/>
+      </entry>
+      <internal>
+        <event xsi:type="thingML:ReceiveMessage" port="//@types.1/@ports.1" message="//@types.38/@messages.2"/>
+        <action xsi:type="thingML:ExternStatement" statement="angleReadingArrived = true;"/>
+      </internal>
+      <internal>
+        <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.1/@ports.11" message="//@types.39/@messages.1"/>
+        <action xsi:type="thingML:ActionBlock">
+          <actions xsi:type="thingML:SendAction" port="//@types.1/@ports.8" message="//@types.27/@messages.1">
+            <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.1/@behaviour.0/@internal.1/@event.0" parameter="//@types.39/@messages.1/@parameters.0"/>
+          </actions>
+          <actions xsi:type="thingML:ExternStatement" statement="if (DEBUG)"/>
+          <actions xsi:type="thingML:SendAction" port="//@types.1/@ports.6" message="//@types.24/@messages.1">
+            <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.1/@behaviour.0/@internal.1/@event.0" parameter="//@types.39/@messages.1/@parameters.0"/>
+            <parameters xsi:type="thingML:ExternExpression" expression="VERBOSE"/>
+          </actions>
+        </action>
+      </internal>
+      <internal>
+        <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.1/@ports.10" message="//@types.39/@messages.0"/>
+        <action xsi:type="thingML:FunctionCallStatement" function="//@types.1/@functions.0">
+          <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.1/@behaviour.0/@internal.2/@event.0" parameter="//@types.39/@messages.0/@parameters.0"/>
+        </action>
+      </internal>
+      <internal>
+        <event xsi:type="thingML:ReceiveMessage" port="//@types.1/@ports.9" message="//@types.29/@messages.1"/>
+        <action xsi:type="thingML:ExternStatement" statement="VERBOSE = DEBUG &amp; !VERBOSE;"/>
+      </internal>
+      <substate name="Load_Calibration">
+        <entry xsi:type="thingML:ActionBlock">
+          <actions xsi:type="thingML:SendAction" port="//@types.1/@ports.11" message="//@types.39/@messages.1">
+            <parameters xsi:type="thingML:IntegerLiteral" intValue="1"/>
+          </actions>
+          <actions xsi:type="thingML:SendAction" port="//@types.1/@ports.3" message="//@types.34/@messages.0"/>
+        </entry>
+        <outgoing name="validate" target="//@types.1/@behaviour.0/@substate.2">
+          <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.1/@ports.3" message="//@types.34/@messages.1"/>
+          <action xsi:type="thingML:FunctionCallStatement" function="//@types.1/@functions.0">
+            <parameters xsi:type="thingML:IntegerLiteral" intValue="5"/>
+          </action>
+        </outgoing>
+        <outgoing name="calibrate" target="//@types.1/@behaviour.0/@substate.1">
+          <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.1/@ports.3" message="//@types.34/@messages.2"/>
+          <action xsi:type="thingML:FunctionCallStatement" function="//@types.1/@functions.0">
+            <parameters xsi:type="thingML:IntegerLiteral" intValue="6"/>
+          </action>
+        </outgoing>
+      </substate>
+      <substate name="Calibration">
+        <entry xsi:type="thingML:ActionBlock">
+          <actions xsi:type="thingML:SendAction" port="//@types.1/@ports.11" message="//@types.39/@messages.1">
+            <parameters xsi:type="thingML:IntegerLiteral" intValue="2"/>
+          </actions>
+          <actions xsi:type="thingML:SendAction" port="//@types.1/@ports.5" message="//@types.7/@messages.0"/>
+        </entry>
+        <internal>
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.1/@ports.9" message="//@types.29/@messages.0"/>
+          <action xsi:type="thingML:SendAction" port="//@types.1/@ports.5" message="//@types.7/@messages.1"/>
+        </internal>
+        <internal>
+          <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.1/@ports.1" message="//@types.38/@messages.2"/>
+          <action xsi:type="thingML:SendAction" port="//@types.1/@ports.5" message="//@types.7/@messages.4">
+            <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.1/@behaviour.0/@substate.1/@internal.1/@event.0" parameter="//@types.38/@messages.2/@parameters.0"/>
+            <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.1/@behaviour.0/@substate.1/@internal.1/@event.0" parameter="//@types.38/@messages.2/@parameters.1"/>
+            <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.1/@behaviour.0/@substate.1/@internal.1/@event.0" parameter="//@types.38/@messages.2/@parameters.2"/>
+            <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.1/@behaviour.0/@substate.1/@internal.1/@event.0" parameter="//@types.38/@messages.2/@parameters.3"/>
+          </action>
+        </internal>
+        <outgoing name="restartCalibration" target="//@types.1/@behaviour.0/@substate.1">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.1/@ports.9" message="//@types.29/@messages.2"/>
+        </outgoing>
+        <outgoing name="validate" target="//@types.1/@behaviour.0/@substate.2">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.1/@ports.5" message="//@types.7/@messages.2"/>
+          <action xsi:type="thingML:SendAction" port="//@types.1/@ports.3" message="//@types.34/@messages.3"/>
+        </outgoing>
+        <outgoing name="recalibrate" target="//@types.1/@behaviour.0/@substate.1">
+          <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.1/@ports.5" message="//@types.7/@messages.3"/>
+        </outgoing>
+      </substate>
+      <substate name="Validate_Calibration">
+        <entry xsi:type="thingML:ActionBlock">
+          <actions xsi:type="thingML:SendAction" port="//@types.1/@ports.11" message="//@types.39/@messages.1">
+            <parameters xsi:type="thingML:IntegerLiteral" intValue="3"/>
+          </actions>
+          <actions xsi:type="thingML:SendAction" port="//@types.1/@ports.4" message="//@types.36/@messages.0"/>
+        </entry>
+        <outgoing name="Calibrate" target="//@types.1/@behaviour.0/@substate.1">
+          <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.1/@ports.4" message="//@types.36/@messages.2"/>
+        </outgoing>
+        <outgoing name="Run" target="//@types.1/@behaviour.0/@substate.3">
+          <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.1/@ports.4" message="//@types.36/@messages.1"/>
+        </outgoing>
+      </substate>
+      <substate name="Runner">
+        <entry xsi:type="thingML:ActionBlock">
+          <actions xsi:type="thingML:SendAction" port="//@types.1/@ports.11" message="//@types.39/@messages.1">
+            <parameters xsi:type="thingML:IntegerLiteral" intValue="4"/>
+          </actions>
+        </entry>
+        <internal>
+          <event xsi:type="thingML:ReceiveMessage" name="angles" port="//@types.1/@ports.1" message="//@types.38/@messages.2"/>
+          <action xsi:type="thingML:SendAction" port="//@types.1/@ports.2" message="//@types.5/@messages.0">
+            <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.1/@behaviour.0/@substate.3/@internal.0/@event.0" parameter="//@types.38/@messages.2/@parameters.0"/>
+            <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.1/@behaviour.0/@substate.3/@internal.0/@event.0" parameter="//@types.38/@messages.2/@parameters.1"/>
+            <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.1/@behaviour.0/@substate.3/@internal.0/@event.0" parameter="//@types.38/@messages.2/@parameters.2"/>
+            <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.1/@behaviour.0/@substate.3/@internal.0/@event.0" parameter="//@types.38/@messages.2/@parameters.3"/>
+          </action>
+        </internal>
+        <internal>
+          <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.1/@ports.2" message="//@types.5/@messages.1"/>
+          <action xsi:type="thingML:ActionBlock">
+            <actions xsi:type="thingML:ConditionalAction">
+              <condition xsi:type="thingML:ExternExpression" expression="DEBUG"/>
+              <action xsi:type="thingML:SendAction" port="//@types.1/@ports.6" message="//@types.24/@messages.2">
+                <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.1/@behaviour.0/@substate.3/@internal.1/@event.0" parameter="//@types.5/@messages.1/@parameters.0"/>
+                <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.1/@behaviour.0/@substate.3/@internal.1/@event.0" parameter="//@types.5/@messages.1/@parameters.1"/>
+                <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.1/@behaviour.0/@substate.3/@internal.1/@event.0" parameter="//@types.5/@messages.1/@parameters.2"/>
+                <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.1/@behaviour.0/@substate.3/@internal.1/@event.0" parameter="//@types.5/@messages.1/@parameters.3"/>
+                <parameters xsi:type="thingML:ExternExpression" expression="VERBOSE"/>
+              </action>
+            </actions>
+            <actions xsi:type="thingML:SendAction" port="//@types.1/@ports.0" message="//@types.0/@messages.0">
+              <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.1/@behaviour.0/@substate.3/@internal.1/@event.0" parameter="//@types.5/@messages.1/@parameters.0"/>
+              <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.1/@behaviour.0/@substate.3/@internal.1/@event.0" parameter="//@types.5/@messages.1/@parameters.1"/>
+              <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.1/@behaviour.0/@substate.3/@internal.1/@event.0" parameter="//@types.5/@messages.1/@parameters.2"/>
+            </actions>
+          </action>
+        </internal>
+        <outgoing target="//@types.1/@behaviour.0/@substate.1">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.1/@ports.9" message="//@types.29/@messages.2"/>
+        </outgoing>
+      </substate>
+    </behaviour>
+  </types>
+  <types xsi:type="thingML:Thing" name="PulseReader" includes="//@types.38">
+    <annotations name="c_header" value="&#xA;        #include &lt;constants.h>&#xA;    "/>
+    <annotations name="c_global" value="&#xA;        volatile uint32_t ftm0_cnt_long;&#xA;        extern struct PulseReader_Instance pulseReader_var;&#xA;        bool STOP = false;&#xA;    "/>
+    <messages name="pulseDetected">
+      <parameters name="start">
+        <typeRef type="//@types.16"/>
+      </parameters>
+      <parameters name="duration">
+        <typeRef type="//@types.16"/>
+      </parameters>
+    </messages>
+    <ports xsi:type="thingML:RequiredPort" name="PulseSender" sends="//@types.38/@messages.0"/>
+    <ports xsi:type="thingML:RequiredPort" name="OverflowNotifier" sends="//@types.38/@messages.3"/>
+    <ports xsi:type="thingML:InternalPort" name="Transitions" sends="//@types.2/@messages.0" receives="//@types.2/@messages.0"/>
+    <functions name="initialize">
+      <annotations name="c_prototype" value="void initialize_()"/>
+      <body xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="&#xA;    &#x9;/* --- Setup the analog comparator (CMP1) --- */&#xA;    &#x9;SIM_SCGC4 |= SIM_SCGC4_CMP;&#xA;    &#x9;CMP1_CR1 = 0x00;&#xA;    &#x9;CMP1_CR0 = 0x00;&#xA;&#xA;    &#x9;PORTC_PCR3 = 0x0000; // PC3 alternative 0&#xA;    &#x9;PORTC_PCR4 = 0x0600; // PC4 alternative 6&#xA;&#xA;    &#x9;CMP1_MUXCR = 0x0F; // Positive input 1 - Negative input DAC&#xA;    &#x9;CMP1_DACCR = 0xD2; // Enable DAC - Vref = Vin1 - DAC voltage 18/64 * Vin = 1.48V&#xA;    &#x9;// The filter will add a delay to the captured pulses, but should not matter as it is the relative time which makes the difference&#xA;    &#x9;CMP1_FPR = 0x01; // Set filter period (of bus clock)&#xA;    &#x9;CMP1_CR0 = 0x73; // Filter 7 samples - 30mV hysteresis&#xA;    &#x9;CMP1_CR1 = 0x13; // Filtered output - Output enable - Comparator enable&#xA;&#xA;    &#x9;/* --- Setup the flex-timer to count pulse lengths --- */&#xA;    &#x9;SIM_SCGC6 |= SIM_SCGC6_FTM0;&#xA;    &#x9;FTM0_SC = 0x00;&#xA;&#xA;    &#x9;PORTD_PCR4 = 0x0400; // PD4 alternative 4&#xA;&#xA;    &#x9;FTM0_CNTIN = 0x00; // Set counter to 0&#xA;    &#x9;FTM0_MOD = 0xFFFF; // Set to free running mode&#xA;    &#x9;FTM0_MODE=0x05; // Set FTMEN bit&#xA;&#xA;    &#x9;FTM0_C4SC = 0x14; // Capture rising edge - and continuous capture - on channel 4&#xA;    &#x9;FTM0_C5SC = 0x48; // Capture falling edge - and enable interrupt - on channel 5&#xA;    &#x9;FTM0_COMBINE = 0x00040000; // Enable dual capture mode on channel 4+5&#xA;&#xA;    &#x9;FTM0_STATUS = 0x00; // Clear any old interrupts&#xA;    &#x9;NVIC_ENABLE_IRQ(IRQ_FTM0); // Enable interrupts for FTM0&#xA;&#xA;    &#x9;ftm0_cnt_long = 0; // We can count to 32-bits if we do it manually&#xA;    &#x9;FTM0_SC |= 0x40; // Interrupt on overflow&#xA;&#xA;    &#x9;FTM0_SC |= 0x08; // Set FTM0 clock to system clock&#xA;    &#x9;FTM0_COMBINE |= 0x00080000; // Set DECAP2 to start capture"/>
+      </body>
+    </functions>
+    <functions name="interruptServiceRoutine">
+      <annotations name="c_prototype" value="void ftm0_isr(void)"/>
+      <body xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="// Counter overflow&#xA;    &#x9;if (FTM0_SC &amp; 0x80) {&#xA;    &#x9;&#x9;ftm0_cnt_long += 0x10000; // Increment long counter&#xA;    &#x9;&#x9;FTM0_SC &amp;= ~0x80; // Reset flag&#xA;&#xA;            if (ftm0_cnt_long == 0x00000000) {&#xA;                // Adjust calibrationStartTime to account for timer overflow.&#xA;                PulseReader_send_OverflowNotifier_timerOverflow(&amp;pulseReader_var);&#xA;            }&#xA;    &#x9;}&#xA;&#xA;        // Falling edge interrupt&#xA;    &#x9;if (FTM0_STATUS &amp; 0x20) {&#xA;    &#x9;&#x9;// Read values and prepare FTM0 for new capture&#xA;    &#x9;&#x9;uint32_t rise = FTM0_C4V;&#xA;    &#x9;&#x9;uint32_t fall = FTM0_C5V;&#xA;    &#x9;&#x9;FTM0_STATUS = 0;&#xA;&#xA;    &#x9;&#x9;// Calculate when the events occurred&#xA;    &#x9;&#x9;uint32_t pulse_time, pulse_width;&#xA;    &#x9;&#x9;if (rise &lt; fall) {&#xA;    &#x9;&#x9;&#x9;// All in one FTM0 counter cycle&#xA;    &#x9;&#x9;&#x9;pulse_time  = ftm0_cnt_long + rise;&#xA;    &#x9;&#x9;&#x9;pulse_width = fall - rise;&#xA;    &#x9;&#x9;} else {&#xA;    &#x9;&#x9;&#x9;// The FTM0 counter overflowed in the middle of the captured pulse&#xA;    &#x9;&#x9;&#x9;pulse_time  = ftm0_cnt_long + rise - 0x10000;&#xA;    &#x9;&#x9;&#x9;pulse_width = 0xFFFF - rise + fall;&#xA;    &#x9;&#x9;}&#xA;&#xA;    &#x9;&#x9;if (!STOP) PulseReader_send_Transitions_pulseDetected(&amp;pulseReader_var, pulse_time, pulse_width);&#xA;        }"/>
+      </body>
+    </functions>
+    <behaviour name="PulseRead" initial="//@types.2/@behaviour.0/@substate.0">
+      <entry xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="initialize_();"/>
+      </entry>
+      <substate name="Idle">
+        <internal>
+          <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.2/@ports.2" message="//@types.2/@messages.0"/>
+          <action xsi:type="thingML:ActionBlock">
+            <actions xsi:type="thingML:SendAction" port="//@types.2/@ports.0" message="//@types.38/@messages.0">
+              <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.2/@behaviour.0/@substate.0/@internal.0/@event.0" parameter="//@types.2/@messages.0/@parameters.0"/>
+              <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.2/@behaviour.0/@substate.0/@internal.0/@event.0" parameter="//@types.2/@messages.0/@parameters.1"/>
+            </actions>
+          </action>
+        </internal>
+      </substate>
+    </behaviour>
+  </types>
+  <types xsi:type="thingML:Thing" name="PackageReader" includes="//@types.38 //@types.39">
+    <annotations name="c_header" value="&#xA;        #include &lt;constants.h>&#xA;    "/>
+    <annotations name="c_global" value="        &#xA;        // startTimes and durations with matching data at same idex&#xA;        uint32_t startTimes [STORED_TIME_STEPS]; // default init to zero in C&#xA;        uint32_t durations [STORED_TIME_STEPS];&#xA;        &#xA;        int identifyedSteps = 0;&#xA;        int startCount = 0;&#xA;    "/>
+    <ports xsi:type="thingML:ProvidedPort" name="PulseReceiver" receives="//@types.38/@messages.0"/>
+    <ports xsi:type="thingML:RequiredPort" name="PackageSender" sends="//@types.38/@messages.1"/>
+    <ports xsi:type="thingML:ProvidedPort" name="StatusSender" sends="//@types.39/@messages.0"/>
+    <functions name="pulse">
+      <parameters name="startTime">
+        <typeRef type="//@types.16"/>
+      </parameters>
+      <parameters name="duration">
+        <typeRef type="//@types.16"/>
+      </parameters>
+      <body xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="&#xA;        if (DEBUG &amp;&amp; VERBOSE) {&#xA;            Serial.println(&quot;&quot;);Serial.print(&quot;A&quot;);Serial.print(&quot;,&quot;);Serial.print(startTime/36);Serial.print(&quot;,&quot;);Serial.print(duration/36);Serial.print(&quot;,&quot;);&#xA;        }&#xA;        &#xA;        int last = STORED_TIME_STEPS-1;&#xA;    &#xA;        // Guard against rapid spikes down in the signal&#xA;        if (startTime - (startTimes[last] + durations[last]) &lt; MIN_PULSE_SEPARATION) {&#xA;            // Do nothing, ignore pulse that comes too close to the end of another.&#xA;            // durations[last] = startTime + duration - startTimes[last]; // If wiching to merge peaks&#xA;    &#xA;        } else {&#xA;            &#xA;            // We have detected a propper peak&#xA;            int last = STORED_TIME_STEPS-1;&#xA;    &#xA;            // maintain fifo arrays&#xA;            for (int i = 0 ; i &lt; last ; i++) {&#xA;                startTimes[i] = startTimes[i+1];&#xA;                durations[i] = durations[i+1];&#xA;            }&#xA;    &#xA;            startTimes[last] = startTime;&#xA;            durations[last] = duration;&#xA;    &#xA;    &#xA;            /*&#xA;             * Check for package pattern&#xA;             * &#xA;             * Strategy:&#xA;             * 1. determine L1 and L2 from separation and duration&#xA;             * 2. use this to determine L3 between two pulses&#xA;             */ &#xA;    &#xA;            if (identifyedSteps > 1) {&#xA;                identifyedSteps--;&#xA;                return;&#xA;            }&#xA;    &#xA;            // Identify L1 and L2&#xA;            if (L12_DURATION_MIN &lt; durations[0] &amp;&amp; durations[0] &lt; L12_DURATION_MAX) {                       // identify L1 candidate&#xA;    &#xA;                if (L12_DURATION_MIN &lt; durations[1] &amp;&amp; durations[1] &lt; L12_DURATION_MAX) {                   // identify L2 candidate&#xA;    &#xA;                    uint32_t L12_separation = startTimes[1] - startTimes[0];&#xA;                    if (L12_SEPARATION_MIN &lt; L12_separation &amp;&amp; L12_separation &lt; L12_SEPARATION_MAX) {       // verify L1-L2 separation          &#xA;    &#xA;                        uint32_t L13_separation = startTimes[2] - startTimes[0];&#xA;                        if (L13_SEPARATION_MIN &lt; L13_separation &amp;&amp; L13_separation &lt; L13_SEPARATION_MAX) {   // verify L1-L3 separation&#xA;    &#xA;                            uint32_t packageL1 = durations[0];&#xA;                            uint32_t packageL2 = durations[1];&#xA;                            uint32_t startTimeL1 = startTimes[0];&#xA;                            uint32_t startTimeL2 = startTimes[1];&#xA;                            &#xA;                            /* &#xA;                             * Handle possible reflections&#xA;                             * Purpouce:&#xA;                             *  - ensure reflection signal do not disturb next package&#xA;                             *  - ensure we choose the signal going forward to be the direct signal&#xA;                             * Assumption: direct signal-ray is most intense/has longest duration pulse&#xA;                             */&#xA;                             &#xA;                            identifyedSteps = 3;&#xA;                            &#xA;                            int signalIndex = 2;&#xA;                            uint32_t signalDuration = durations[signalIndex];&#xA;                            &#xA;                            for (int i = identifyedSteps ; i &lt; STORED_TIME_STEPS ; i++) {&#xA;                                uint32_t L14_separation = startTimes[i] - startTimes[0];&#xA;                                &#xA;                                if (L14_separation &lt; MIN_PACKAGE_SEPARATION) {&#xA;                                    identifyedSteps++;&#xA;                                    "/>
+        <actions xsi:type="thingML:SendAction" port="//@types.3/@ports.2" message="//@types.39/@messages.0">
+          <parameters xsi:type="thingML:IntegerLiteral" intValue="3"/>
+        </actions>
+        <actions xsi:type="thingML:ExternStatement" statement="&#xA;                                    &#xA;                                    if (signalDuration &lt; durations[i]) {&#xA;                                        signalIndex = i;&#xA;                                        signalDuration = durations[i];&#xA;                                    }&#xA;                                }&#xA;                            }&#xA;                            &#xA;                            uint32_t packageSignal = startTimes[signalIndex] - startTimeL1;&#xA;                            "/>
+        <actions xsi:type="thingML:SendAction" port="//@types.3/@ports.1" message="//@types.38/@messages.1">
+          <parameters xsi:type="thingML:ExternExpression" expression="startTimeL1"/>
+          <parameters xsi:type="thingML:ExternExpression" expression="startTimeL2"/>
+          <parameters xsi:type="thingML:ExternExpression" expression="packageL1"/>
+          <parameters xsi:type="thingML:ExternExpression" expression="packageL2"/>
+          <parameters xsi:type="thingML:ExternExpression" expression="packageSignal"/>
+        </actions>
+        <actions xsi:type="thingML:ExternStatement" statement="&#xA;                            if (DEBUG &amp;&amp; VERBOSE) {&#xA;                                Serial.println(&quot;&quot;);Serial.print(&quot;B&quot;);Serial.print(&quot;,&quot;);Serial.print((double) startTimeL1/36,6);Serial.print(&quot;,&quot;);Serial.print((double) packageL1/36,6);Serial.print(&quot;,&quot;);Serial.print((double) packageL2/36,6);Serial.print(&quot;,&quot;);Serial.print((double) packageSignal/36,6);Serial.print(&quot;,&quot;);Serial.print(identifyedSteps);Serial.print(&quot;,&quot;);Serial.print((startTimes[identifyedSteps]-startTimeL1)/36);Serial.print(&quot;,&quot;);&#xA;                            }&#xA;                        }&#xA;                    }&#xA;                }&#xA;            }&#xA;        }"/>
+      </body>
+    </functions>
+    <behaviour name="PackageRead" initial="//@types.3/@behaviour.0/@substate.0">
+      <substate name="Idle">
+        <internal>
+          <event xsi:type="thingML:ReceiveMessage" name="a" port="//@types.3/@ports.0" message="//@types.38/@messages.0"/>
+          <action xsi:type="thingML:ActionBlock">
+            <actions xsi:type="thingML:FunctionCallStatement" function="//@types.3/@functions.0">
+              <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.3/@behaviour.0/@substate.0/@internal.0/@event.0" parameter="//@types.38/@messages.0/@parameters.0"/>
+              <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.3/@behaviour.0/@substate.0/@internal.0/@event.0" parameter="//@types.38/@messages.0/@parameters.1"/>
+            </actions>
+          </action>
+        </internal>
+      </substate>
+    </behaviour>
+  </types>
+  <types xsi:type="thingML:Thing" name="AngleReader" includes="//@types.38 //@types.39">
+    <annotations name="c_header" value="&#xA;        #include &lt;constants.h>&#xA;        &#xA;        enum SignalType {&#xA;            // b - master, c - slave&#xA;            // h - horisontal, v - vertical&#xA;            bh = 0, bv = 1, ch = 2, cv = 3, error = 4&#xA;        };&#xA;    "/>
+    <annotations name="c_global" value="&#xA;    &#xA;        // Last package arrays&#xA;        uint32_t L1s [STORED_STEPS];&#xA;        uint32_t L2s [STORED_STEPS];&#xA;        int signalIndex = 0;&#xA;        &#xA;        double signalAngles[4];         // Last read angles sufficiently close to its own previous value&#xA;        double lastSignalAngles[4];     // Last read angles&#xA;        &#xA;        uint32_t lastStartTime = 0;&#xA;        &#xA;        uint32_t calibrationStartTime;&#xA;        int calibrationStep = 0;&#xA;        int initiationCount = 0;&#xA;        int recalibrateCount = 0;&#xA;        &#xA;        int printWhenZero = 0;         // Only print when we have gotten four consecutive angles&#xA;        &#xA;        enum Signal {&#xA;            off = 0, horisontal = 1, vertical = 2&#xA;        };&#xA;        &#xA;        uint32_t average(uint32_t L[], int count) {&#xA;            uint32_t sum = 0;&#xA;        &#xA;            for (int i = 0; i &lt; count; i++) {&#xA;                sum += L[i];&#xA;            }&#xA;            return sum/count;&#xA;        }&#xA;        &#xA;        uint32_t maxVal(uint32_t L[], int count) {&#xA;            uint32_t ret = L[0];&#xA;            for (int i = 1; i&lt;count; i++) {&#xA;                if (L[i] > ret) {&#xA;                    ret = L[i];&#xA;                }&#xA;            }&#xA;            return ret;&#xA;        }&#xA;        &#xA;        uint32_t minVal(uint32_t L[], int count) {&#xA;            uint32_t ret = L[0];&#xA;            for (int i = 1; i&lt;count; i++) {&#xA;                if (L[i] &lt; ret) {&#xA;                    ret = L[i];&#xA;                }&#xA;            }&#xA;            return ret;&#xA;        }&#xA;        &#xA;        Signal classifyPulse(uint32_t signal, uint32_t L[], int count) {&#xA;        &#xA;            int min = minVal(L, count);&#xA;            int max = maxVal(L, count);&#xA;        &#xA;            int category = (7*(signal - min + PULSE_WIDTH_SEPARATION/2))/(max - min);&#xA;            &#xA;            switch (category) {&#xA;                case 0:&#xA;                    return Signal::horisontal;&#xA;                    break;&#xA;                case 1:&#xA;                    return Signal::vertical;&#xA;                    break;&#xA;                case 2:&#xA;                    return Signal::horisontal;&#xA;                    break;&#xA;                case 3:&#xA;                    return Signal::vertical;&#xA;                    break;&#xA;                default:&#xA;                    return Signal::off;&#xA;                    break;&#xA;            }&#xA;        &#xA;            return Signal::off;   &#xA;        }&#xA;        &#xA;        SignalType identifySignal(Signal L1, Signal L2) {&#xA;            return (L1 == Signal::off) ? (L2 == Signal::horisontal) ? SignalType::ch:(L2 == Signal::vertical) ? SignalType::cv : SignalType::error : (L2 == Signal::off) ? (L1 == Signal::horisontal) ? SignalType::bh : (L1 == Signal::vertical) ? SignalType::bv : SignalType::error : SignalType::error;&#xA;        }&#xA;    "/>
+    <messages name="startTimeCalibrated"/>
+    <messages name="recalibrate"/>
+    <ports xsi:type="thingML:ProvidedPort" name="PackageReceiver" receives="//@types.38/@messages.1"/>
+    <ports xsi:type="thingML:ProvidedPort" name="AngleSender" sends="//@types.38/@messages.2"/>
+    <ports xsi:type="thingML:ProvidedPort" name="OverflowNotifier" receives="//@types.38/@messages.3"/>
+    <ports xsi:type="thingML:ProvidedPort" name="StatusSender" sends="//@types.39/@messages.0"/>
+    <ports xsi:type="thingML:InternalPort" name="Transitions" sends="//@types.4/@messages.0 //@types.4/@messages.1" receives="//@types.4/@messages.0 //@types.4/@messages.1"/>
+    <functions name="updateAngles">
+      <parameters name="inputSignal">
+        <typeRef type="//@types.16"/>
+      </parameters>
+      <parameters name="signalType">
+        <typeRef type="//@types.13"/>
+      </parameters>
+      <parameters name="L2delay">
+        <typeRef type="//@types.16"/>
+      </parameters>
+      <parameters name="calibrated">
+        <typeRef type="//@types.12"/>
+      </parameters>
+      <body xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="&#xA;        SignalType type = SignalType(">
+          <segments xsi:type="thingML:PropertyReference" property="//@types.4/@functions.0/@parameters.1"/>
+          <segments xsi:type="thingML:ExternExpression" expression=");&#xA;        uint32_t signal = (type == SignalType::bh || type == SignalType::bv) ? ">
+            <segments xsi:type="thingML:PropertyReference" property="//@types.4/@functions.0/@parameters.0"/>
+            <segments xsi:type="thingML:ExternExpression" expression=" : ">
+              <segments xsi:type="thingML:MinusExpression">
+                <lhs xsi:type="thingML:PropertyReference" property="//@types.4/@functions.0/@parameters.0"/>
+                <rhs xsi:type="thingML:PropertyReference" property="//@types.4/@functions.0/@parameters.2"/>
+              </segments>
+              <segments xsi:type="thingML:ExternExpression" expression=";&#xA;        &#xA;        double signalAngleMag = PI * ((double) signal)/PERIOD - PI/2;&#xA;        double signalAngle = (type == SignalType::bh || type == SignalType::ch) ? -signalAngleMag : signalAngleMag;&#xA;        &#xA;        // Account for observed deviation in angle measurnment &#xA;        //signalAngle = signalAngle*(1.0-0.00455);&#xA;        &#xA;        if (type == SignalType::error) {&#xA;            "/>
+            </segments>
+          </segments>
+        </actions>
+        <actions xsi:type="thingML:SendAction" port="//@types.4/@ports.3" message="//@types.39/@messages.0">
+          <parameters xsi:type="thingML:IntegerLiteral" intValue="15"/>
+        </actions>
+        <actions xsi:type="thingML:ExternStatement" statement="&#xA;            &#xA;        } else {&#xA;           &#xA;            if (abs(signalAngle - lastSignalAngles[type]) &lt; MAX_VALID_ANGLE_DIFFERENCE) {&#xA;                 signalAngles[type] = signalAngle;  // Only print angle for consecutive simular angles&#xA;            } &#xA;           &#xA;            lastSignalAngles[type] = signalAngle;   // Record last measured angle regardless&#xA;        }&#xA;        &#xA;        if (DEBUG &amp;&amp; VERBOSE) {&#xA;            if (">
+          <segments xsi:type="thingML:PropertyReference" property="//@types.4/@functions.0/@parameters.3"/>
+          <segments xsi:type="thingML:ExternExpression" expression=") {&#xA;                Serial.print(&quot;\nD,&quot;);&#xA;                Serial.print(type);&#xA;                Serial.print(&quot;,&quot;);&#xA;                Serial.print(signalAngle,6);&#xA;                Serial.print(&quot;,&quot;);&#xA;            }&#xA;            &#xA;            if (type == SignalType::bh) {&#xA;                Serial.print(&quot;\nE,&quot;);&#xA;                Serial.print(signalAngles[0],6);&#xA;                Serial.print(&quot;,&quot;);&#xA;                Serial.print(signalAngles[1],6);&#xA;                Serial.print(&quot;,&quot;);&#xA;                Serial.print(signalAngles[2],6);&#xA;                Serial.print(&quot;,&quot;);&#xA;                Serial.print(signalAngles[3],6);&#xA;                Serial.print(&quot;,&quot;);&#xA;            }&#xA;        }&#xA;        "/>
+        </actions>
+      </body>
+    </functions>
+    <functions name="printAngleInformation">
+      <parameters name="L1">
+        <typeRef type="//@types.16"/>
+      </parameters>
+      <parameters name="L2">
+        <typeRef type="//@types.16"/>
+      </parameters>
+      <body xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="&#xA;        Signal L1Type = classifyPulse(">
+          <segments xsi:type="thingML:PropertyReference" property="//@types.4/@functions.1/@parameters.0"/>
+          <segments xsi:type="thingML:ExternExpression" expression=", L1s, STORED_STEPS);&#xA;        Signal L2Type = classifyPulse(">
+            <segments xsi:type="thingML:PropertyReference" property="//@types.4/@functions.1/@parameters.1"/>
+            <segments xsi:type="thingML:ExternExpression" expression=", L2s, STORED_STEPS);&#xA;        SignalType signalType = identifySignal(L1Type, L2Type);&#xA;&#xA;        Serial.print(&quot;\nC,&quot;);&#xA;        Serial.print((int) L1Type);&#xA;        Serial.print(&quot;,&quot;);&#xA;        Serial.print((int) L2Type);&#xA;        Serial.print(&quot;,&quot;);&#xA;        Serial.print((int) signalType);&#xA;        Serial.print(&quot;,&quot;);&#xA;        Serial.print(calibrationStep);&#xA;        Serial.print(&quot;,&quot;);&#xA;        "/>
+          </segments>
+        </actions>
+      </body>
+    </functions>
+    <functions name="updateLastPackageArrays">
+      <parameters name="L1">
+        <typeRef type="//@types.16"/>
+      </parameters>
+      <parameters name="L2">
+        <typeRef type="//@types.16"/>
+      </parameters>
+      <body xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="&#xA;        L1s[signalIndex] = ">
+          <segments xsi:type="thingML:PropertyReference" property="//@types.4/@functions.2/@parameters.0"/>
+          <segments xsi:type="thingML:ExternExpression" expression=";&#xA;        L2s[signalIndex] = ">
+            <segments xsi:type="thingML:PropertyReference" property="//@types.4/@functions.2/@parameters.1"/>
+            <segments xsi:type="thingML:ExternExpression" expression=";&#xA;        &#xA;        // update index for next itteration&#xA;        if (signalIndex &lt; STORED_STEPS) {&#xA;            signalIndex++;&#xA;        } else {&#xA;            signalIndex = 0;&#xA;        }&#xA;        "/>
+          </segments>
+        </actions>
+      </body>
+    </functions>
+    <behaviour name="SingalDetectionStrategy" initial="//@types.4/@behaviour.0/@substate.0">
+      <internal>
+        <event xsi:type="thingML:ReceiveMessage" port="//@types.4/@ports.2" message="//@types.38/@messages.3"/>
+        <action xsi:type="thingML:ActionBlock">
+          <actions xsi:type="thingML:ExternStatement" statement="calibrationStartTime = (calibrationStartTime + (PERIODS_PER_CLOCK+1) * PERIOD * 4) % (PERIOD * 4);&#xA;            &#xA;            if (DEBUG &amp;&amp; !VERBOSE) {&#xA;                Serial.print(&quot;\nTimer overflow occured. &quot;);&#xA;            }&#xA;            &#xA;            "/>
+        </action>
+      </internal>
+      <substate name="PulseWidths">
+        <entry xsi:type="thingML:SendAction" port="//@types.4/@ports.3" message="//@types.39/@messages.0">
+          <parameters xsi:type="thingML:IntegerLiteral" intValue="12"/>
+        </entry>
+        <internal>
+          <event xsi:type="thingML:ReceiveMessage" name="a" port="//@types.4/@ports.0" message="//@types.38/@messages.1"/>
+          <action xsi:type="thingML:ActionBlock">
+            <actions xsi:type="thingML:FunctionCallStatement" function="//@types.4/@functions.2">
+              <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.4/@behaviour.0/@substate.0/@internal.0/@event.0" parameter="//@types.38/@messages.1/@parameters.2"/>
+              <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.4/@behaviour.0/@substate.0/@internal.0/@event.0" parameter="//@types.38/@messages.1/@parameters.3"/>
+            </actions>
+            <actions xsi:type="thingML:ExternStatement" statement="&#xA;                if (initiationCount >= STORED_STEPS) {&#xA;                    Signal L1Type = classifyPulse(">
+              <segments xsi:type="thingML:EventReference" receiveMsg="//@types.4/@behaviour.0/@substate.0/@internal.0/@event.0" parameter="//@types.38/@messages.1/@parameters.2"/>
+              <segments xsi:type="thingML:ExternExpression" expression=", L1s, STORED_STEPS);&#xA;                    Signal L2Type = classifyPulse(">
+                <segments xsi:type="thingML:EventReference" receiveMsg="//@types.4/@behaviour.0/@substate.0/@internal.0/@event.0" parameter="//@types.38/@messages.1/@parameters.3"/>
+                <segments xsi:type="thingML:ExternExpression" expression=", L2s, STORED_STEPS);&#xA;    &#xA;                    SignalType signalType = identifySignal(L1Type, L2Type);&#xA;                    &#xA;                    if (calibrationStep % 4 == signalType) {&#xA;                        calibrationStep++;&#xA;                    } else {&#xA;                        calibrationStep = 0;&#xA;                    }&#xA;                    &#xA;                    if (calibrationStep == CALIBRATION_SAMPLES * 4 + 1) {"/>
+              </segments>
+            </actions>
+            <actions xsi:type="thingML:SendAction" port="//@types.4/@ports.4" message="//@types.4/@messages.0"/>
+            <actions xsi:type="thingML:ExternStatement" statement="calibrationStartTime = ">
+              <segments xsi:type="thingML:EventReference" receiveMsg="//@types.4/@behaviour.0/@substate.0/@internal.0/@event.0" parameter="//@types.38/@messages.1/@parameters.0"/>
+              <segments xsi:type="thingML:ExternExpression" expression=" % (PERIOD * 4);&#xA;                    }&#xA;                    "/>
+            </actions>
+            <actions xsi:type="thingML:FunctionCallStatement" function="//@types.4/@functions.0">
+              <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.4/@behaviour.0/@substate.0/@internal.0/@event.0" parameter="//@types.38/@messages.1/@parameters.4"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="signalType"/>
+              <parameters xsi:type="thingML:MinusExpression">
+                <lhs xsi:type="thingML:EventReference" receiveMsg="//@types.4/@behaviour.0/@substate.0/@internal.0/@event.0" parameter="//@types.38/@messages.1/@parameters.1"/>
+                <rhs xsi:type="thingML:EventReference" receiveMsg="//@types.4/@behaviour.0/@substate.0/@internal.0/@event.0" parameter="//@types.38/@messages.1/@parameters.0"/>
+              </parameters>
+              <parameters xsi:type="thingML:BooleanLiteral"/>
+            </actions>
+            <actions xsi:type="thingML:SendAction" port="//@types.4/@ports.1" message="//@types.38/@messages.2">
+              <parameters xsi:type="thingML:ExternExpression" expression="signalAngles[0]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="signalAngles[1]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="signalAngles[2]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="signalAngles[3]"/>
+            </actions>
+            <actions xsi:type="thingML:ExternStatement" statement="if (DEBUG &amp;&amp; VERBOSE) {"/>
+            <actions xsi:type="thingML:FunctionCallStatement" function="//@types.4/@functions.1">
+              <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.4/@behaviour.0/@substate.0/@internal.0/@event.0" parameter="//@types.38/@messages.1/@parameters.2"/>
+              <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.4/@behaviour.0/@substate.0/@internal.0/@event.0" parameter="//@types.38/@messages.1/@parameters.3"/>
+            </actions>
+            <actions xsi:type="thingML:ExternStatement" statement="}&#xA;                } else {&#xA;                    initiationCount++;&#xA;                }"/>
+          </action>
+        </internal>
+        <outgoing target="//@types.4/@behaviour.0/@substate.1">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.4/@ports.4" message="//@types.4/@messages.0"/>
+        </outgoing>
+      </substate>
+      <substate name="ArrivalTime">
+        <entry xsi:type="thingML:SendAction" port="//@types.4/@ports.3" message="//@types.39/@messages.0">
+          <parameters xsi:type="thingML:IntegerLiteral" intValue="13"/>
+        </entry>
+        <internal>
+          <event xsi:type="thingML:ReceiveMessage" name="a" port="//@types.4/@ports.0" message="//@types.38/@messages.1"/>
+          <action xsi:type="thingML:ActionBlock">
+            <actions xsi:type="thingML:ExternStatement" statement="&#xA;                // Handle first few pulses in signal that arrive &quot;before&quot; startTime (after foverflow)&#xA;                uint32_t startTime = ">
+              <segments xsi:type="thingML:EventReference" receiveMsg="//@types.4/@behaviour.0/@substate.1/@internal.0/@event.0" parameter="//@types.38/@messages.1/@parameters.0"/>
+              <segments xsi:type="thingML:ExternExpression" expression=" &lt; calibrationStartTime ? ">
+                <segments xsi:type="thingML:EventReference" receiveMsg="//@types.4/@behaviour.0/@substate.1/@internal.0/@event.0" parameter="//@types.38/@messages.1/@parameters.0"/>
+                <segments xsi:type="thingML:ExternExpression" expression=" += 4*PERIOD : ">
+                  <segments xsi:type="thingML:EventReference" receiveMsg="//@types.4/@behaviour.0/@substate.1/@internal.0/@event.0" parameter="//@types.38/@messages.1/@parameters.0"/>
+                  <segments xsi:type="thingML:ExternExpression" expression=";&#xA;                &#xA;                // Send event if one or more angles have not been read&#xA;                uint32_t diff = startTime - lastStartTime;&#xA;                if (!(MIN_PACKAGE_SEPARATION &lt; diff &amp;&amp; diff &lt; MAX_PACKAGE_SEPARATION)) {&#xA;                    printWhenZero = 4; // Wait until this angle-measurnment arrives next (in four itterations). "/>
+                </segments>
+              </segments>
+            </actions>
+            <actions xsi:type="thingML:SendAction" port="//@types.4/@ports.3" message="//@types.39/@messages.0">
+              <parameters xsi:type="thingML:IntegerLiteral" intValue="1"/>
+            </actions>
+            <actions xsi:type="thingML:ExternStatement" statement="}&#xA;                lastStartTime = startTime;&#xA;                &#xA;                // Classify package&#xA;                int val = ((startTime-calibrationStartTime + PERIOD/2) / PERIOD) % 4;&#xA;                SignalType signalType = SignalType(val);&#xA;        &#xA;                // Handle timing drift (from teensy or Base Stations)&#xA;                double n = (double) (startTime-calibrationStartTime)/(PERIOD);&#xA;                double difference = n - (long)n;&#xA;        &#xA;                if (difference &lt; TIME_DRIFT_CORRECTOIN_THRESHOLD) {&#xA;                    calibrationStartTime += TIME_DRIFT_CORRECTOIN_CONSTANT;&#xA;                } else if (1-TIME_DRIFT_CORRECTOIN_THRESHOLD &lt; difference) {&#xA;                    calibrationStartTime -= TIME_DRIFT_CORRECTOIN_CONSTANT;&#xA;                } else {&#xA;                    if (recalibrateCount++ > RECALIBRATE_SAMPLES) {"/>
+            <actions xsi:type="thingML:SendAction" port="//@types.4/@ports.4" message="//@types.4/@messages.1"/>
+            <actions xsi:type="thingML:SendAction" port="//@types.4/@ports.3" message="//@types.39/@messages.0">
+              <parameters xsi:type="thingML:IntegerLiteral" intValue="11"/>
+            </actions>
+            <actions xsi:type="thingML:ExternStatement" statement="} else {"/>
+            <actions xsi:type="thingML:SendAction" port="//@types.4/@ports.3" message="//@types.39/@messages.0">
+              <parameters xsi:type="thingML:IntegerLiteral" intValue="10"/>
+            </actions>
+            <actions xsi:type="thingML:ExternStatement" statement="}&#xA;                    return;&#xA;                }&#xA;                if (recalibrateCount != 0) recalibrateCount = 0;&#xA;                "/>
+            <actions xsi:type="thingML:FunctionCallStatement" function="//@types.4/@functions.0">
+              <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.4/@behaviour.0/@substate.1/@internal.0/@event.0" parameter="//@types.38/@messages.1/@parameters.4"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="signalType"/>
+              <parameters xsi:type="thingML:MinusExpression">
+                <lhs xsi:type="thingML:EventReference" receiveMsg="//@types.4/@behaviour.0/@substate.1/@internal.0/@event.0" parameter="//@types.38/@messages.1/@parameters.1"/>
+                <rhs xsi:type="thingML:EventReference" receiveMsg="//@types.4/@behaviour.0/@substate.1/@internal.0/@event.0" parameter="//@types.38/@messages.1/@parameters.0"/>
+              </parameters>
+              <parameters xsi:type="thingML:BooleanLiteral" boolValue="true"/>
+            </actions>
+            <actions xsi:type="thingML:ExternStatement" statement="if (printWhenZero == 0) {"/>
+            <actions xsi:type="thingML:SendAction" port="//@types.4/@ports.1" message="//@types.38/@messages.2">
+              <parameters xsi:type="thingML:ExternExpression" expression="signalAngles[0]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="signalAngles[1]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="signalAngles[2]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="signalAngles[3]"/>
+            </actions>
+            <actions xsi:type="thingML:ExternStatement" statement="} else {&#xA;                    printWhenZero--;&#xA;                } &#xA;                &#xA;                if (DEBUG &amp;&amp; VERBOSE) {"/>
+            <actions xsi:type="thingML:FunctionCallStatement" function="//@types.4/@functions.1">
+              <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.4/@behaviour.0/@substate.1/@internal.0/@event.0" parameter="//@types.38/@messages.1/@parameters.2"/>
+              <parameters xsi:type="thingML:EventReference" receiveMsg="//@types.4/@behaviour.0/@substate.1/@internal.0/@event.0" parameter="//@types.38/@messages.1/@parameters.3"/>
+            </actions>
+            <actions xsi:type="thingML:ExternStatement" statement="}"/>
+          </action>
+        </internal>
+        <outgoing target="//@types.4/@behaviour.0/@substate.0">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.4/@ports.4" message="//@types.4/@messages.1"/>
+        </outgoing>
+      </substate>
+    </behaviour>
+  </types>
+  <types xsi:type="thingML:Thing" name="eRunner" fragment="true">
+    <messages name="baseStationAngles">
+      <parameters name="bh">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="bv">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="ch">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="cv">
+        <typeRef type="//@types.20"/>
+      </parameters>
+    </messages>
+    <messages name="coordinates">
+      <parameters name="x">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="y">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="z">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="separation">
+        <typeRef type="//@types.20"/>
+      </parameters>
+    </messages>
+  </types>
+  <types xsi:type="thingML:Thing" name="Runner" includes="//@types.5 //@types.39">
+    <annotations name="c_header" value="&#xA;    #include &lt;constants.h>&#xA;    #include &lt;calibration.hpp>&#xA;"/>
+    <annotations name="c_global" value="&#xA;    Pose bPose;&#xA;    Pose cPose;&#xA;"/>
+    <ports xsi:type="thingML:ProvidedPort" name="Run" sends="//@types.5/@messages.1" receives="//@types.5/@messages.0"/>
+    <ports xsi:type="thingML:ProvidedPort" name="StatusSender" sends="//@types.39/@messages.0"/>
+    <behaviour name="Running" initial="//@types.6/@behaviour.0/@substate.0">
+      <internal>
+        <event xsi:type="thingML:ReceiveMessage" name="a" port="//@types.6/@ports.0" message="//@types.5/@messages.0"/>
+        <action xsi:type="thingML:ActionBlock">
+          <actions xsi:type="thingML:ExternStatement" statement="Vec p = positionFromAngles(">
+            <segments xsi:type="thingML:EventReference" receiveMsg="//@types.6/@behaviour.0/@internal.0/@event.0" parameter="//@types.5/@messages.0/@parameters.0"/>
+            <segments xsi:type="thingML:ExternExpression" expression=",">
+              <segments xsi:type="thingML:EventReference" receiveMsg="//@types.6/@behaviour.0/@internal.0/@event.0" parameter="//@types.5/@messages.0/@parameters.1"/>
+              <segments xsi:type="thingML:ExternExpression" expression=",">
+                <segments xsi:type="thingML:EventReference" receiveMsg="//@types.6/@behaviour.0/@internal.0/@event.0" parameter="//@types.5/@messages.0/@parameters.2"/>
+                <segments xsi:type="thingML:ExternExpression" expression=",">
+                  <segments xsi:type="thingML:EventReference" receiveMsg="//@types.6/@behaviour.0/@internal.0/@event.0" parameter="//@types.5/@messages.0/@parameters.3"/>
+                  <segments xsi:type="thingML:ExternExpression" expression=");"/>
+                </segments>
+              </segments>
+            </segments>
+          </actions>
+          <actions xsi:type="thingML:SendAction" port="//@types.6/@ports.0" message="//@types.5/@messages.1">
+            <parameters xsi:type="thingML:ExternExpression" expression="p[0]"/>
+            <parameters xsi:type="thingML:ExternExpression" expression="p[1]"/>
+            <parameters xsi:type="thingML:ExternExpression" expression="p[2]"/>
+            <parameters xsi:type="thingML:ExternExpression" expression="diststanceBetweenLines"/>
+          </actions>
+          <actions xsi:type="thingML:ConditionalAction">
+            <condition xsi:type="thingML:ExternExpression" expression="diststanceBetweenLines > MAX_LINE_SEPARATION"/>
+            <action xsi:type="thingML:SendAction" port="//@types.6/@ports.1" message="//@types.39/@messages.0">
+              <parameters xsi:type="thingML:IntegerLiteral"/>
+            </action>
+          </actions>
+        </action>
+      </internal>
+      <substate name="Idle">
+        <entry xsi:type="thingML:ActionBlock"/>
+      </substate>
+    </behaviour>
+  </types>
+  <types xsi:type="thingML:Thing" name="eCalibration" fragment="true">
+    <messages name="calibrate"/>
+    <messages name="entrypoint"/>
+    <messages name="endcalibrate"/>
+    <messages name="errcalibrate"/>
+    <messages name="receiveAngles">
+      <parameters name="bh">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="bv">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="ch">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="cv">
+        <typeRef type="//@types.20"/>
+      </parameters>
+    </messages>
+    <messages name="receivecalibration">
+      <parameters name="bx">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="by">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="bz">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="brx">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="bry">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="brz">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="cx">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="cy">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="cz">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="crx">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="cry">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="crz">
+        <typeRef type="//@types.20"/>
+      </parameters>
+    </messages>
+    <messages name="calibrationfromserial"/>
+  </types>
+  <types xsi:type="thingML:Thing" name="iCalibration" fragment="true">
+    <messages name="calibrating"/>
+    <messages name="calibrationComplete"/>
+    <messages name="calibrationFailed"/>
+  </types>
+  <types xsi:type="thingML:Thing" name="Calibrator" includes="//@types.8 //@types.7 //@types.39">
+    <annotations name="c_header" value="&#xA;    #include &lt;Timer.h>&#xA;    #include &lt;constants.h>&#xA;    #include &lt;calibration.hpp>&#xA;"/>
+    <annotations name="c_global" value="&#xA;    double angleValues[CALIBRATION_POINT_COLLECTION_COUNT][4] = {0};&#xA;    int angleIndex = 0;&#xA;    bool endCalibration = 0;&#xA;    &#xA;    uint8_t fourCounter = 0;&#xA;"/>
+    <ports xsi:type="thingML:ProvidedPort" name="calibrator" sends="//@types.7/@messages.2 //@types.7/@messages.3 //@types.7/@messages.6" receives="//@types.7/@messages.0 //@types.7/@messages.1 //@types.7/@messages.4 //@types.7/@messages.5"/>
+    <ports xsi:type="thingML:ProvidedPort" name="StatusSender" sends="//@types.39/@messages.0"/>
+    <ports xsi:type="thingML:InternalPort" name="avt" sends="//@types.8/@messages.0 //@types.8/@messages.1 //@types.8/@messages.2" receives="//@types.8/@messages.0 //@types.8/@messages.1 //@types.8/@messages.2"/>
+    <functions name="printAngles">
+      <parameters name="bh">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="bv">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="ch">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="cv">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <body xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="if (VERBOSE) Serial.print(&quot;\nF,&quot;);&#xA;        else Serial.print(&quot;\nAverage Angles:\t&quot;);&#xA;        &#xA;        Serial.print(">
+          <segments xsi:type="thingML:PropertyReference" property="//@types.9/@functions.0/@parameters.0"/>
+          <segments xsi:type="thingML:ExternExpression" expression=",6);&#xA;        Serial.print(&quot;,&quot;);&#xA;        Serial.print(">
+            <segments xsi:type="thingML:PropertyReference" property="//@types.9/@functions.0/@parameters.1"/>
+            <segments xsi:type="thingML:ExternExpression" expression=",6);&#xA;        Serial.print(&quot;,&quot;);&#xA;        Serial.print(">
+              <segments xsi:type="thingML:PropertyReference" property="//@types.9/@functions.0/@parameters.2"/>
+              <segments xsi:type="thingML:ExternExpression" expression=",6);&#xA;        Serial.print(&quot;,&quot;);&#xA;        Serial.print(">
+                <segments xsi:type="thingML:PropertyReference" property="//@types.9/@functions.0/@parameters.3"/>
+                <segments xsi:type="thingML:ExternExpression" expression=",6);&#xA;        Serial.print(&quot;,&quot;);"/>
+              </segments>
+            </segments>
+          </segments>
+        </actions>
+      </body>
+    </functions>
+    <functions name="printVariation">
+      <parameters name="bh">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="bv">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="ch">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="cv">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <body xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="if (VERBOSE) Serial.print(&quot;\nG,&quot;);&#xA;        else Serial.print(&quot;\nVariation Angles:\t&quot;);&#xA;        &#xA;        Serial.print(">
+          <segments xsi:type="thingML:PropertyReference" property="//@types.9/@functions.1/@parameters.0"/>
+          <segments xsi:type="thingML:ExternExpression" expression=",6);&#xA;        Serial.print(&quot;,&quot;);&#xA;        Serial.print(">
+            <segments xsi:type="thingML:PropertyReference" property="//@types.9/@functions.1/@parameters.1"/>
+            <segments xsi:type="thingML:ExternExpression" expression=",6);&#xA;        Serial.print(&quot;,&quot;);&#xA;        Serial.print(">
+              <segments xsi:type="thingML:PropertyReference" property="//@types.9/@functions.1/@parameters.2"/>
+              <segments xsi:type="thingML:ExternExpression" expression=",6);&#xA;        Serial.print(&quot;,&quot;);&#xA;        Serial.print(">
+                <segments xsi:type="thingML:PropertyReference" property="//@types.9/@functions.1/@parameters.3"/>
+                <segments xsi:type="thingML:ExternExpression" expression=",6);&#xA;        Serial.print(&quot;,&quot;);"/>
+              </segments>
+            </segments>
+          </segments>
+        </actions>
+      </body>
+    </functions>
+    <functions name="printCalibration">
+      <body xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="&#xA;&#x9;   if (VERBOSE) Serial.print(&quot;\nK,&quot;);&#xA;&#x9;   else Serial.print(&quot;\nCalibration:\n\nPb:\t&quot;);&#xA;&#x9;   &#xA;&#x9;   Serial.print(&quot;,&quot;);&#xA;       Serial.print(posePb.position.getX());&#xA;       Serial.print(&quot;,&quot;);&#xA;       Serial.print(posePb.position.getY());&#xA;       Serial.print(&quot;,&quot;);&#xA;       Serial.print(posePb.position.getZ());&#xA;       Serial.print(&quot;,&quot;);&#xA;       Serial.print(posePb.orientation.getX());&#xA;       Serial.print(&quot;,&quot;);&#xA;       Serial.print(posePb.orientation.getY());&#xA;       Serial.print(&quot;,&quot;);&#xA;       Serial.println(posePb.orientation.getZ());&#xA;       Serial.print(&quot;,&quot;);&#xA;&#xA;       if (!VERBOSE) Serial.print(&quot;\nPc:\t&quot;);&#xA;       &#xA;       Serial.print(posePc.position.getX());&#xA;       Serial.print(&quot;,&quot;);&#xA;       Serial.print(posePc.position.getY());&#xA;       Serial.print(&quot;,&quot;);&#xA;       Serial.print(posePc.position.getZ());&#xA;       Serial.print(&quot;,&quot;);&#xA;       Serial.print(posePc.orientation.getX());&#xA;       Serial.print(&quot;,&quot;);&#xA;       Serial.print(posePc.orientation.getY());&#xA;       Serial.print(&quot;,&quot;);&#xA;       Serial.println(posePc.orientation.getZ());&#xA;       Serial.print(&quot;,&quot;);&#xA;       &#xA;       if (!VERBOSE) Serial.print(&quot;\n Point 4 error:\t&quot;);&#xA;       &#xA;       Serial.print(pointError);&#xA;&#x9;   Serial.print(&quot;,&quot;);&#xA;&#x9;   &#xA;&#x9;   if (!VERBOSE) Serial.print(&quot;\n&quot;);&#xA;&#x9;   "/>
+      </body>
+    </functions>
+    <behaviour name="Calibrator" initial="//@types.9/@behaviour.0/@substate.0">
+      <entry xsi:type="thingML:ActionBlock"/>
+      <substate name="Idle">
+        <outgoing name="calibrate" target="//@types.9/@behaviour.0/@substate.1">
+          <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.9/@ports.0" message="//@types.7/@messages.0"/>
+        </outgoing>
+      </substate>
+      <substate name="Calibrate">
+        <entry xsi:type="thingML:ActionBlock">
+          <actions xsi:type="thingML:ConditionalAction">
+            <condition xsi:type="thingML:ExternExpression" expression="endCalibration"/>
+            <action xsi:type="thingML:ActionBlock">
+              <actions xsi:type="thingML:ConditionalAction">
+                <condition xsi:type="thingML:ExternExpression" expression="calibrationFailed"/>
+                <action xsi:type="thingML:ActionBlock">
+                  <actions xsi:type="thingML:SendAction" port="//@types.9/@ports.1" message="//@types.39/@messages.0">
+                    <parameters xsi:type="thingML:IntegerLiteral" intValue="7"/>
+                  </actions>
+                  <actions xsi:type="thingML:SendAction" port="//@types.9/@ports.2" message="//@types.8/@messages.2"/>
+                </action>
+                <elseAction xsi:type="thingML:ActionBlock">
+                  <actions xsi:type="thingML:SendAction" port="//@types.9/@ports.1" message="//@types.39/@messages.0">
+                    <parameters xsi:type="thingML:IntegerLiteral" intValue="4"/>
+                  </actions>
+                  <actions xsi:type="thingML:ConditionalAction">
+                    <condition xsi:type="thingML:ExternExpression" expression="DEBUG"/>
+                    <action xsi:type="thingML:FunctionCallStatement" function="//@types.9/@functions.2"/>
+                  </actions>
+                  <actions xsi:type="thingML:SendAction" port="//@types.9/@ports.2" message="//@types.8/@messages.1"/>
+                </elseAction>
+              </actions>
+              <actions xsi:type="thingML:ExternStatement" statement="&#xA;                    endCalibration = 0;&#xA;                    calibrationFailed = false;&#xA;                    "/>
+            </action>
+          </actions>
+        </entry>
+        <outgoing target="//@types.9/@behaviour.0/@substate.2">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.9/@ports.0" message="//@types.7/@messages.1"/>
+        </outgoing>
+        <outgoing target="//@types.9/@behaviour.0/@substate.0">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.9/@ports.2" message="//@types.8/@messages.1"/>
+          <action xsi:type="thingML:SendAction" port="//@types.9/@ports.0" message="//@types.7/@messages.2"/>
+        </outgoing>
+        <outgoing target="//@types.9/@behaviour.0/@substate.0">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.9/@ports.2" message="//@types.8/@messages.2"/>
+          <action xsi:type="thingML:SendAction" port="//@types.9/@ports.0" message="//@types.7/@messages.3"/>
+        </outgoing>
+        <outgoing target="//@types.9/@behaviour.0/@substate.1">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.9/@ports.0" message="//@types.7/@messages.0"/>
+          <action xsi:type="thingML:ExternStatement" statement="restartCalibration();"/>
+        </outgoing>
+      </substate>
+      <substate name="PointCollect">
+        <entry xsi:type="thingML:ActionBlock">
+          <actions xsi:type="thingML:ExternStatement" statement="angleIndex = 0;"/>
+          <actions xsi:type="thingML:SendAction" port="//@types.9/@ports.1" message="//@types.39/@messages.0">
+            <parameters xsi:type="thingML:IntegerLiteral" intValue="2"/>
+          </actions>
+        </entry>
+        <internal>
+          <event xsi:type="thingML:ReceiveMessage" name="angles" port="//@types.9/@ports.0" message="//@types.7/@messages.4"/>
+          <action xsi:type="thingML:ActionBlock">
+            <actions xsi:type="thingML:ExternStatement" statement="&#xA;                // Only collect data-points whena all have been refreshed&#xA;                if (++fourCounter == 4) {&#xA;                    fourCounter = 0;&#xA;                    &#xA;                    angleValues[angleIndex][0] = ">
+              <segments xsi:type="thingML:EventReference" receiveMsg="//@types.9/@behaviour.0/@substate.2/@internal.0/@event.0" parameter="//@types.7/@messages.4/@parameters.0"/>
+              <segments xsi:type="thingML:ExternExpression" expression=";&#xA;                    angleValues[angleIndex][1] = ">
+                <segments xsi:type="thingML:EventReference" receiveMsg="//@types.9/@behaviour.0/@substate.2/@internal.0/@event.0" parameter="//@types.7/@messages.4/@parameters.1"/>
+                <segments xsi:type="thingML:ExternExpression" expression=";&#xA;                    angleValues[angleIndex][2] = ">
+                  <segments xsi:type="thingML:EventReference" receiveMsg="//@types.9/@behaviour.0/@substate.2/@internal.0/@event.0" parameter="//@types.7/@messages.4/@parameters.2"/>
+                  <segments xsi:type="thingML:ExternExpression" expression=";&#xA;                    angleValues[angleIndex][3] = ">
+                    <segments xsi:type="thingML:EventReference" receiveMsg="//@types.9/@behaviour.0/@substate.2/@internal.0/@event.0" parameter="//@types.7/@messages.4/@parameters.3"/>
+                    <segments xsi:type="thingML:ExternExpression" expression=";&#xA;                    angleIndex++;&#xA;                }&#xA;                &#xA;                if (angleIndex == CALIBRATION_POINT_COLLECTION_COUNT) {&#xA;                    angleIndex = 0;"/>
+                  </segments>
+                </segments>
+              </segments>
+            </actions>
+            <actions xsi:type="thingML:SendAction" port="//@types.9/@ports.2" message="//@types.8/@messages.0"/>
+            <actions xsi:type="thingML:ExternStatement" statement="}"/>
+          </action>
+        </internal>
+        <outgoing target="//@types.9/@behaviour.0/@substate.1">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.9/@ports.0" message="//@types.7/@messages.0"/>
+          <action xsi:type="thingML:ExternStatement" statement="restartCalibration();"/>
+        </outgoing>
+        <outgoing target="//@types.9/@behaviour.0/@substate.1">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.9/@ports.2" message="//@types.8/@messages.0"/>
+          <action xsi:type="thingML:ActionBlock">
+            <actions xsi:type="thingML:ExternStatement" statement="&#xA;                double largest[4] = {angleValues[0][0], angleValues[0][1], angleValues[0][2], angleValues[0][3]};&#xA;                double smallest[4] = {angleValues[0][0], angleValues[0][1], angleValues[0][2], angleValues[0][3]};&#xA;                double sum[4] = {0};&#xA;                &#xA;                for (int i = 0; i &lt; CALIBRATION_POINT_COLLECTION_COUNT; i++) {&#xA;                    for (int j = 0; j &lt;  4; j++) {&#xA;                        if (largest[j] &lt; angleValues[i][j]) largest[j] = angleValues[i][j];&#xA;                        if (smallest[j] > angleValues[i][j]) smallest[j] = angleValues[i][j];&#xA;                        sum[j] += angleValues[i][j];&#xA;                    }&#xA;                }&#xA;                &#xA;                double average[4] = {0};&#xA;                bool ok = true;&#xA;                &#xA;                for (int j = 0; j &lt;  4; j++) {&#xA;                    if (largest[j] - smallest[j] > LARGEST_ANGLE_DEVIATION_FOR_SINGLE_MEASURNMENT) {"/>
+            <actions xsi:type="thingML:ExternStatement" statement="ok = false;&#xA;                    }&#xA;                    average[j] = sum[j]/CALIBRATION_POINT_COLLECTION_COUNT;&#xA;                } &#xA;                &#xA;                if (ok) {&#xA;                    "/>
+            <actions xsi:type="thingML:SendAction" port="//@types.9/@ports.1" message="//@types.39/@messages.0">
+              <parameters xsi:type="thingML:IntegerLiteral" intValue="8"/>
+            </actions>
+            <actions xsi:type="thingML:ExternStatement" statement="&#xA;                    &#xA;                    STOP = true;&#xA;                    endCalibration = collectAnglesForPoint(average[0], average[1], average[2], average[3]);&#xA;                    STOP = false;&#xA;                    "/>
+            <actions xsi:type="thingML:ConditionalAction">
+              <condition xsi:type="thingML:ExternExpression" expression="DEBUG"/>
+              <action xsi:type="thingML:FunctionCallStatement" function="//@types.9/@functions.0">
+                <parameters xsi:type="thingML:ExternExpression" expression="average[0]"/>
+                <parameters xsi:type="thingML:ExternExpression" expression="average[1]"/>
+                <parameters xsi:type="thingML:ExternExpression" expression="average[2]"/>
+                <parameters xsi:type="thingML:ExternExpression" expression="average[3]"/>
+              </action>
+            </actions>
+            <actions xsi:type="thingML:ExternStatement" statement="} else {"/>
+            <actions xsi:type="thingML:SendAction" port="//@types.9/@ports.1" message="//@types.39/@messages.0">
+              <parameters xsi:type="thingML:IntegerLiteral" intValue="9"/>
+            </actions>
+            <actions xsi:type="thingML:ExternStatement" statement="}"/>
+            <actions xsi:type="thingML:ConditionalAction">
+              <condition xsi:type="thingML:ExternExpression" expression="DEBUG"/>
+              <action xsi:type="thingML:FunctionCallStatement" function="//@types.9/@functions.1">
+                <parameters xsi:type="thingML:ExternExpression" expression="largest[0]-smallest[0]"/>
+                <parameters xsi:type="thingML:ExternExpression" expression="largest[1]-smallest[1]"/>
+                <parameters xsi:type="thingML:ExternExpression" expression="largest[2]-smallest[2]"/>
+                <parameters xsi:type="thingML:ExternExpression" expression="largest[3]-smallest[3]"/>
+              </action>
+            </actions>
+          </action>
+        </outgoing>
+      </substate>
+    </behaviour>
+  </types>
+  <types xsi:type="thingML:PrimitiveType" name="Char" ByteSize="1">
+    <annotations name="type_checker" value="Integer"/>
+    <annotations name="c_type" value="char"/>
+    <annotations name="c_byte_size" value="1"/>
+  </types>
+  <types xsi:type="thingML:ObjectType" name="String">
+    <annotations name="type_checker" value="String"/>
+    <annotations name="c_type" value="char *"/>
+    <annotations name="c_byte_size" value="2"/>
+  </types>
+  <types xsi:type="thingML:PrimitiveType" name="Boolean" ByteSize="1">
+    <annotations name="type_checker" value="Boolean"/>
+    <annotations name="c_type" value="uint8_t"/>
+    <annotations name="c_byte_size" value="1"/>
+  </types>
+  <types xsi:type="thingML:PrimitiveType" name="UInt8" ByteSize="1">
+    <annotations name="type_checker" value="Integer"/>
+    <annotations name="c_type" value="uint8_t"/>
+    <annotations name="c_byte_size" value="1"/>
+  </types>
+  <types xsi:type="thingML:PrimitiveType" name="UInt16" ByteSize="2">
+    <annotations name="type_checker" value="Integer"/>
+    <annotations name="c_type" value="uint16_t"/>
+    <annotations name="c_byte_size" value="2"/>
+    <annotations name="java_type" value="int"/>
+    <annotations name="java_primitive" value="true"/>
+  </types>
+  <types xsi:type="thingML:PrimitiveType" name="Int16" ByteSize="2">
+    <annotations name="type_checker" value="Integer"/>
+    <annotations name="c_type" value="int16_t"/>
+    <annotations name="c_byte_size" value="2"/>
+  </types>
+  <types xsi:type="thingML:PrimitiveType" name="UInt32" ByteSize="4">
+    <annotations name="type_checker" value="Integer"/>
+    <annotations name="c_type" value="uint32_t"/>
+    <annotations name="c_byte_size" value="4"/>
+  </types>
+  <types xsi:type="thingML:PrimitiveType" name="Integer" ByteSize="2">
+    <annotations name="type_checker" value="Integer"/>
+    <annotations name="c_type" value="int16_t"/>
+    <annotations name="c_byte_size" value="2"/>
+  </types>
+  <types xsi:type="thingML:PrimitiveType" name="Long" ByteSize="4">
+    <annotations name="type_checker" value="Integer"/>
+    <annotations name="c_type" value="long"/>
+    <annotations name="c_byte_size" value="4"/>
+  </types>
+  <types xsi:type="thingML:PrimitiveType" name="Float" ByteSize="4">
+    <annotations name="type_checker" value="Real"/>
+    <annotations name="c_type" value="float"/>
+    <annotations name="c_byte_size" value="4"/>
+  </types>
+  <types xsi:type="thingML:PrimitiveType" name="Double" ByteSize="8">
+    <annotations name="type_checker" value="Real"/>
+    <annotations name="c_type" value="double"/>
+    <annotations name="c_byte_size" value="8"/>
+  </types>
+  <types xsi:type="thingML:Enumeration" name="DigitalState">
+    <annotations name="c_byte_size" value="1"/>
+    <annotations name="c_type" value="uint8_t"/>
+    <literals name="LOW">
+      <annotations name="enum_val" value="0"/>
+    </literals>
+    <literals name="HIGH">
+      <annotations name="enum_val" value="1"/>
+    </literals>
+  </types>
+  <types xsi:type="thingML:PrimitiveType" name="Byte" ByteSize="1">
+    <annotations name="type_checker" value="Integer"/>
+    <annotations name="c_type" value="uint8_t"/>
+    <annotations name="c_byte_size" value="1"/>
+    <annotations name="java_type" value="byte"/>
+    <annotations name="java_primitive" value="true"/>
+    <annotations name="scala_type" value="Byte"/>
+    <annotations name="SenML_type" value="Double"/>
+  </types>
+  <types xsi:type="thingML:Enumeration" name="DigitalState">
+    <annotations name="c_type" value="uint8_t"/>
+    <annotations name="c_byte_size" value="1"/>
+    <literals name="LOW">
+      <annotations name="enum_val" value="0"/>
+    </literals>
+    <literals name="HIGH">
+      <annotations name="enum_val" value="1"/>
+    </literals>
+  </types>
+  <types xsi:type="thingML:Thing" name="msgout" fragment="true">
+    <messages name="printStatus">
+      <parameters name="id">
+        <typeRef type="//@types.13"/>
+      </parameters>
+      <parameters name="verbose">
+        <typeRef type="//@types.12"/>
+      </parameters>
+    </messages>
+    <messages name="printOperationState">
+      <parameters name="id">
+        <typeRef type="//@types.13"/>
+      </parameters>
+      <parameters name="verbose">
+        <typeRef type="//@types.12"/>
+      </parameters>
+    </messages>
+    <messages name="printPoint">
+      <parameters name="x">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="y">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="z">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="separation">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="verbose">
+        <typeRef type="//@types.12"/>
+      </parameters>
+    </messages>
+  </types>
+  <types xsi:type="thingML:Thing" name="msgin" fragment="true">
+    <messages name="waitcalibration"/>
+    <messages name="calibrationreceived">
+      <parameters name="bx">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="by">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="bz">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="brx">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="bry">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="brz">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="cx">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="cy">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="cz">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="crx">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="cry">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="crz">
+        <typeRef type="//@types.20"/>
+      </parameters>
+    </messages>
+  </types>
+  <types xsi:type="thingML:Thing" name="iserialin" fragment="true">
+    <messages name="serial_timeout"/>
+  </types>
+  <types xsi:type="thingML:Thing" name="eblinker" fragment="true">
+    <messages name="statusID">
+      <parameters name="id">
+        <typeRef type="//@types.13"/>
+      </parameters>
+    </messages>
+    <messages name="stateID">
+      <parameters name="id">
+        <typeRef type="//@types.13"/>
+      </parameters>
+    </messages>
+  </types>
+  <types xsi:type="thingML:Thing" name="iSoftButton" fragment="true">
+    <messages name="timer_timeout"/>
+  </types>
+  <types xsi:type="thingML:Thing" name="SoftButtonMsgs" fragment="true">
+    <messages name="click"/>
+    <messages name="double_click"/>
+    <messages name="long_press"/>
+  </types>
+  <types xsi:type="thingML:Thing" name="SerialOut" includes="//@types.24">
+    <ports xsi:type="thingML:ProvidedPort" name="basic" receives="//@types.24/@messages.0 //@types.24/@messages.1 //@types.24/@messages.2"/>
+    <behaviour name="Message" initial="//@types.30/@behaviour.0/@substate.0">
+      <entry xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="Serial.begin(115200);"/>
+      </entry>
+      <substate name="Idle">
+        <internal>
+          <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.30/@ports.0" message="//@types.24/@messages.0"/>
+          <action xsi:type="thingML:ActionBlock">
+            <actions xsi:type="thingML:ConditionalAction">
+              <condition xsi:type="thingML:EventReference" receiveMsg="//@types.30/@behaviour.0/@substate.0/@internal.0/@event.0" parameter="//@types.24/@messages.0/@parameters.1"/>
+              <action xsi:type="thingML:ActionBlock">
+                <actions xsi:type="thingML:ExternStatement" statement="&#xA;                    Serial.print(&quot;\nH,&quot;);&#xA;                    Serial.print(">
+                  <segments xsi:type="thingML:EventReference" receiveMsg="//@types.30/@behaviour.0/@substate.0/@internal.0/@event.0" parameter="//@types.24/@messages.0/@parameters.0"/>
+                  <segments xsi:type="thingML:ExternExpression" expression=");&#xA;                    Serial.print(&quot;,&quot;);&#xA;                "/>
+                </actions>
+              </action>
+              <elseAction xsi:type="thingML:ActionBlock">
+                <actions xsi:type="thingML:ExternStatement" statement="&#xA;&#x9;&#x9;            Serial.print(&quot;\nStatus:\t&quot;);&#xA;&#x9;&#x9;            Serial.print(">
+                  <segments xsi:type="thingML:EventReference" receiveMsg="//@types.30/@behaviour.0/@substate.0/@internal.0/@event.0" parameter="//@types.24/@messages.0/@parameters.0"/>
+                  <segments xsi:type="thingML:ExternExpression" expression=");&#xA;&#x9;&#x9;        "/>
+                </actions>
+              </elseAction>
+            </actions>
+          </action>
+        </internal>
+        <internal>
+          <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.30/@ports.0" message="//@types.24/@messages.1"/>
+          <action xsi:type="thingML:ActionBlock">
+            <actions xsi:type="thingML:ConditionalAction">
+              <condition xsi:type="thingML:EventReference" receiveMsg="//@types.30/@behaviour.0/@substate.0/@internal.1/@event.0" parameter="//@types.24/@messages.1/@parameters.1"/>
+              <action xsi:type="thingML:ActionBlock">
+                <actions xsi:type="thingML:ExternStatement" statement="&#xA;                    Serial.print(&quot;\nI,&quot;);&#xA;                    Serial.print(">
+                  <segments xsi:type="thingML:EventReference" receiveMsg="//@types.30/@behaviour.0/@substate.0/@internal.1/@event.0" parameter="//@types.24/@messages.1/@parameters.0"/>
+                  <segments xsi:type="thingML:ExternExpression" expression=");&#xA;                    Serial.print(&quot;,&quot;);&#xA;                "/>
+                </actions>
+              </action>
+              <elseAction xsi:type="thingML:ActionBlock">
+                <actions xsi:type="thingML:ExternStatement" statement="&#xA;                    Serial.print(&quot;\nState:\t&quot;);&#xA;                    Serial.print(">
+                  <segments xsi:type="thingML:EventReference" receiveMsg="//@types.30/@behaviour.0/@substate.0/@internal.1/@event.0" parameter="//@types.24/@messages.1/@parameters.0"/>
+                  <segments xsi:type="thingML:ExternExpression" expression=");&#xA;                "/>
+                </actions>
+              </elseAction>
+            </actions>
+          </action>
+        </internal>
+        <internal>
+          <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.30/@ports.0" message="//@types.24/@messages.2"/>
+          <action xsi:type="thingML:ActionBlock">
+            <actions xsi:type="thingML:ConditionalAction">
+              <condition xsi:type="thingML:EventReference" receiveMsg="//@types.30/@behaviour.0/@substate.0/@internal.2/@event.0" parameter="//@types.24/@messages.2/@parameters.4"/>
+              <action xsi:type="thingML:ActionBlock">
+                <actions xsi:type="thingML:ExternStatement" statement="&#xA;    &#x9;&#x9;        Serial.print(&quot;\nJ,&quot;);&#xA;    &#x9;&#x9;        Serial.print(">
+                  <segments xsi:type="thingML:EventReference" receiveMsg="//@types.30/@behaviour.0/@substate.0/@internal.2/@event.0" parameter="//@types.24/@messages.2/@parameters.0"/>
+                  <segments xsi:type="thingML:ExternExpression" expression=",3);&#xA;    &#x9;&#x9;        Serial.print(&quot;,&quot;);&#xA;    &#x9;&#x9;        Serial.print(">
+                    <segments xsi:type="thingML:EventReference" receiveMsg="//@types.30/@behaviour.0/@substate.0/@internal.2/@event.0" parameter="//@types.24/@messages.2/@parameters.1"/>
+                    <segments xsi:type="thingML:ExternExpression" expression=",3);&#xA;    &#x9;&#x9;        Serial.print(&quot;,&quot;);&#xA;    &#x9;&#x9;        Serial.print(">
+                      <segments xsi:type="thingML:EventReference" receiveMsg="//@types.30/@behaviour.0/@substate.0/@internal.2/@event.0" parameter="//@types.24/@messages.2/@parameters.2"/>
+                      <segments xsi:type="thingML:ExternExpression" expression=",3);&#xA;    &#x9;&#x9;        Serial.print(&quot;,&quot;);&#xA;    &#x9;&#x9;        Serial.print(">
+                        <segments xsi:type="thingML:EventReference" receiveMsg="//@types.30/@behaviour.0/@substate.0/@internal.2/@event.0" parameter="//@types.24/@messages.2/@parameters.3"/>
+                        <segments xsi:type="thingML:ExternExpression" expression=",4);&#xA;                    Serial.print(&quot;,&quot;);&#xA;    &#x9;&#x9;    "/>
+                      </segments>
+                    </segments>
+                  </segments>
+                </actions>
+              </action>
+              <elseAction xsi:type="thingML:ActionBlock">
+                <actions xsi:type="thingML:ExternStatement" statement="&#xA;                    Serial.print(&quot;\nPoint:\t&quot;);&#xA;                    Serial.print(">
+                  <segments xsi:type="thingML:EventReference" receiveMsg="//@types.30/@behaviour.0/@substate.0/@internal.2/@event.0" parameter="//@types.24/@messages.2/@parameters.0"/>
+                  <segments xsi:type="thingML:ExternExpression" expression=",3);&#xA;                    Serial.print(&quot;,\t&quot;);&#xA;                    Serial.print(">
+                    <segments xsi:type="thingML:EventReference" receiveMsg="//@types.30/@behaviour.0/@substate.0/@internal.2/@event.0" parameter="//@types.24/@messages.2/@parameters.1"/>
+                    <segments xsi:type="thingML:ExternExpression" expression=",3);&#xA;                    Serial.print(&quot;,\t&quot;);&#xA;                    Serial.print(">
+                      <segments xsi:type="thingML:EventReference" receiveMsg="//@types.30/@behaviour.0/@substate.0/@internal.2/@event.0" parameter="//@types.24/@messages.2/@parameters.2"/>
+                      <segments xsi:type="thingML:ExternExpression" expression=",3);&#xA;                    Serial.print(&quot;,\t&quot;); &#xA;                    Serial.print(">
+                        <segments xsi:type="thingML:EventReference" receiveMsg="//@types.30/@behaviour.0/@substate.0/@internal.2/@event.0" parameter="//@types.24/@messages.2/@parameters.3"/>
+                        <segments xsi:type="thingML:ExternExpression" expression=",4);&#xA;    &#x9;&#x9;    "/>
+                      </segments>
+                    </segments>
+                  </segments>
+                </actions>
+              </elseAction>
+            </actions>
+          </action>
+        </internal>
+      </substate>
+    </behaviour>
+  </types>
+  <types xsi:type="thingML:Thing" name="SerialIn" includes="//@types.25 //@types.26">
+    <annotations name="c_header" value="#include &lt;Timer.h>&#xA;#include &lt;constants.h>"/>
+    <annotations name="c_global" value="extern struct SerialIn_Instance serialIn_var;"/>
+    <ports xsi:type="thingML:ProvidedPort" name="serialcall" sends="//@types.25/@messages.1" receives="//@types.25/@messages.0"/>
+    <ports xsi:type="thingML:InternalPort" name="Timer" sends="//@types.26/@messages.0" receives="//@types.26/@messages.0"/>
+    <functions name="timeout_serialreader">
+      <annotations name="c_prototype" value="void timeout_serialreader()"/>
+      <body xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="SerialIn_send_Timer_serial_timeout(&amp;serialIn_var);"/>
+      </body>
+    </functions>
+    <behaviour name="serialreader" initial="//@types.31/@behaviour.0/@substate.0">
+      <substate name="Idle">
+        <outgoing target="//@types.31/@behaviour.0/@substate.1">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.31/@ports.0" message="//@types.25/@messages.0"/>
+        </outgoing>
+      </substate>
+      <substate name="CalibrationReceiver">
+        <entry xsi:type="thingML:ExternStatement" statement="start_timer(2, 25, &amp;timeout_serialreader);"/>
+        <outgoing target="//@types.31/@behaviour.0/@substate.0">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.31/@ports.1" message="//@types.26/@messages.0"/>
+          <guard xsi:type="thingML:ExternExpression" expression="Serial.available()"/>
+          <action xsi:type="thingML:ActionBlock">
+            <actions xsi:type="thingML:ExternStatement" statement="&#xA;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;udouble ud ;&#xA;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;for(int i = 0; i &lt; 96; i++){&#xA;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;ud.b[i] = Serial.read();&#xA;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9;&#x9; }"/>
+            <actions xsi:type="thingML:SendAction" port="//@types.31/@ports.0" message="//@types.25/@messages.1">
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[0]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[1]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[2]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[3]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[4]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[5]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[6]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[7]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[8]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[9]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[10]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[11]"/>
+            </actions>
+          </action>
+        </outgoing>
+      </substate>
+    </behaviour>
+  </types>
+  <types xsi:type="thingML:Thing" name="SoftButton" includes="//@types.40 //@types.28 //@types.29">
+    <annotations name="c_header" value="#include &lt;Timer.h>"/>
+    <annotations name="c_global" value="extern struct SoftButton_Instance softButton_var;"/>
+    <ports xsi:type="thingML:RequiredPort" name="Button" receives="//@types.40/@messages.0 //@types.40/@messages.1"/>
+    <ports xsi:type="thingML:InternalPort" name="Timer" sends="//@types.28/@messages.0" receives="//@types.28/@messages.0"/>
+    <ports xsi:type="thingML:ProvidedPort" name="SoftButton" sends="//@types.29/@messages.0 //@types.29/@messages.1 //@types.29/@messages.2"/>
+    <properties name="long_delay" readonly="true">
+      <typeRef type="//@types.14"/>
+      <init xsi:type="thingML:IntegerLiteral" intValue="1000"/>
+    </properties>
+    <properties name="double_delay" readonly="true">
+      <typeRef type="//@types.14"/>
+      <init xsi:type="thingML:IntegerLiteral" intValue="250"/>
+    </properties>
+    <functions name="timeout_button">
+      <annotations name="c_prototype" value="void timeout_button()"/>
+      <body xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="SoftButton_send_Timer_timer_timeout(&amp;softButton_var);"/>
+      </body>
+    </functions>
+    <behaviour name="SoftButtonImpl" initial="//@types.32/@behaviour.0/@substate.0">
+      <substate name="Idle">
+        <outgoing name="pressed" target="//@types.32/@behaviour.0/@substate.1">
+          <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.32/@ports.0" message="//@types.40/@messages.0"/>
+        </outgoing>
+      </substate>
+      <substate name="Pressed">
+        <entry xsi:type="thingML:ExternStatement" statement="start_timer(1, ">
+          <segments xsi:type="thingML:PropertyReference" property="//@types.32/@properties.0"/>
+          <segments xsi:type="thingML:ExternExpression" expression=", &amp;timeout_button);"/>
+        </entry>
+        <exit xsi:type="thingML:ExternStatement" statement="timer_cancel(1);"/>
+        <outgoing name="long" target="//@types.32/@behaviour.0/@substate.0">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.32/@ports.1" message="//@types.28/@messages.0"/>
+          <action xsi:type="thingML:SendAction" port="//@types.32/@ports.2" message="//@types.29/@messages.2"/>
+        </outgoing>
+        <outgoing name="click" target="//@types.32/@behaviour.0/@substate.2">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.32/@ports.0" message="//@types.40/@messages.1"/>
+        </outgoing>
+      </substate>
+      <substate name="Released">
+        <entry xsi:type="thingML:ExternStatement" statement="start_timer(1, ">
+          <segments xsi:type="thingML:PropertyReference" property="//@types.32/@properties.1"/>
+          <segments xsi:type="thingML:ExternExpression" expression=", &amp;timeout_button);"/>
+        </entry>
+        <exit xsi:type="thingML:ExternStatement" statement="timer_cancel(1);"/>
+        <outgoing name="click" target="//@types.32/@behaviour.0/@substate.0">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.32/@ports.1" message="//@types.28/@messages.0"/>
+          <action xsi:type="thingML:SendAction" port="//@types.32/@ports.2" message="//@types.29/@messages.0"/>
+        </outgoing>
+        <outgoing name="double" target="//@types.32/@behaviour.0/@substate.0">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.32/@ports.0" message="//@types.40/@messages.0"/>
+          <action xsi:type="thingML:SendAction" port="//@types.32/@ports.2" message="//@types.29/@messages.1"/>
+        </outgoing>
+      </substate>
+    </behaviour>
+  </types>
+  <types xsi:type="thingML:Thing" name="Blinker" includes="//@types.27">
+    <annotations name="c_header" value="&#xA;#include &lt;Timer.h>&#xA;#include &lt;Adafruit_NeoPixel.h>&#xA;#include &lt;Color_Helper.h>&#xA;"/>
+    <annotations name="c_global" value="&#xA;extern struct Blinker_Instance blinker_var;&#xA;boolean current_blink = HIGH;&#xA;&#xA;#define PIN 8&#xA;#define NUM_LEDS 1&#xA;#define BRIGHTNESS 50&#xA;&#xA;uint32_t returnColor = RED;&#xA;bool timeout = false;&#xA;int8_t timeoutPriority = 0;&#xA;&#xA;Adafruit_NeoPixel led = Adafruit_NeoPixel(NUM_LEDS, PIN, NEO_GRBW + NEO_KHZ800);&#xA;"/>
+    <messages name="blink"/>
+    <ports xsi:type="thingML:InternalPort" name="evt" sends="//@types.33/@messages.0" receives="//@types.33/@messages.0"/>
+    <ports xsi:type="thingML:ProvidedPort" name="neopixel" receives="//@types.27/@messages.1 //@types.27/@messages.0"/>
+    <functions name="startLEDFlashAfterDuration">
+      <parameters name="duration">
+        <typeRef type="//@types.16"/>
+      </parameters>
+      <body xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="start_timer(5, ">
+          <segments xsi:type="thingML:PropertyReference" property="//@types.33/@functions.0/@parameters.0"/>
+          <segments xsi:type="thingML:ExternExpression" expression=", &amp;callback_message_flash);"/>
+        </actions>
+      </body>
+    </functions>
+    <functions name="callback_message_flash">
+      <annotations name="c_prototype" value="void callback_message_flash()"/>
+      <body xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="&#xA;        Blinker_send_evt_blink(&amp;blinker_var);&#xA;        start_timer(5, 100, &amp;callback_message_flash);&#xA;        "/>
+      </body>
+    </functions>
+    <functions name="setColorForDuration">
+      <parameters name="color">
+        <typeRef type="//@types.16"/>
+      </parameters>
+      <parameters name="duration">
+        <typeRef type="//@types.16"/>
+      </parameters>
+      <body xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="led.setPixelColor(0, ">
+          <segments xsi:type="thingML:PropertyReference" property="//@types.33/@functions.2/@parameters.0"/>
+          <segments xsi:type="thingML:ExternExpression" expression=");&#xA;        led.show();"/>
+        </actions>
+        <actions xsi:type="thingML:ExternStatement" statement="start_timer(6, ">
+          <segments xsi:type="thingML:PropertyReference" property="//@types.33/@functions.2/@parameters.1"/>
+          <segments xsi:type="thingML:ExternExpression" expression=", &amp;callback_message_neopixel);"/>
+        </actions>
+      </body>
+    </functions>
+    <functions name="callback_message_neopixel">
+      <annotations name="c_prototype" value="void callback_message_neopixel()"/>
+      <body xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="&#xA;        led.setPixelColor(0, returnColor);&#xA;        led.show();&#xA;        "/>
+      </body>
+    </functions>
+    <functions name="timeoutColorChangeForDuration">
+      <parameters name="duration">
+        <typeRef type="//@types.16"/>
+      </parameters>
+      <body xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="timeout = true;"/>
+        <actions xsi:type="thingML:ExternStatement" statement="start_timer(7, ">
+          <segments xsi:type="thingML:PropertyReference" property="//@types.33/@functions.4/@parameters.0"/>
+          <segments xsi:type="thingML:ExternExpression" expression=", &amp;callback_message_timeout);"/>
+        </actions>
+      </body>
+    </functions>
+    <functions name="callback_message_timeout">
+      <annotations name="c_prototype" value="void callback_message_timeout()"/>
+      <body xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="timeout = false;"/>
+      </body>
+    </functions>
+    <behaviour name="BlinkerState" initial="//@types.33/@behaviour.0/@substate.0">
+      <entry xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="pinMode(13, OUTPUT);&#xA;    &#x9;&#x9;&#x9;&#x9; led.setBrightness(BRIGHTNESS);&#xA;&#x9;&#x9;&#x9;&#x9;&#x9; led.begin();&#xA;&#x9;&#x9;&#x9;&#x9;&#x9; led.show();&#xA;    &#x9;&#x9;&#x9;&#x9; "/>
+        <actions xsi:type="thingML:FunctionCallStatement" function="//@types.33/@functions.0">
+          <parameters xsi:type="thingML:IntegerLiteral" intValue="1000"/>
+        </actions>
+      </entry>
+      <internal>
+        <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.33/@ports.0" message="//@types.33/@messages.0"/>
+        <action xsi:type="thingML:ActionBlock">
+          <actions xsi:type="thingML:ExternStatement" statement="&#xA;&#x9;&#x9;    digitalWriteFast(13, current_blink);&#xA;    &#x9;&#x9;current_blink = (current_blink == HIGH)? LOW : HIGH;&#xA;    &#x9;    "/>
+        </action>
+      </internal>
+      <internal>
+        <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.33/@ports.1" message="//@types.27/@messages.1"/>
+        <action xsi:type="thingML:ActionBlock">
+          <actions xsi:type="thingML:ExternStatement" statement="&#xA;&#xA;    &#x9;&#x9;switch(">
+            <segments xsi:type="thingML:EventReference" receiveMsg="//@types.33/@behaviour.0/@internal.1/@event.0" parameter="//@types.27/@messages.1/@parameters.0"/>
+            <segments xsi:type="thingML:ExternExpression" expression=") {&#xA;    &#x9;&#x9;    case 1: returnColor  = ORANGE; break; // LoadCalibration&#xA;    &#x9;&#x9;    case 2: returnColor  = WHITE; break;  // Calibration&#xA;    &#x9;&#x9;    case 3: returnColor  = ORANGE; break; // Validate_Calibration&#xA;    &#x9;&#x9;    case 4: returnColor  = GREEN;  break; // Runner&#xA;    &#x9;&#x9;    default: returnColor = BLACK;&#xA;    &#x9;&#x9;}&#xA;&#xA;    &#x9;&#x9;if (!timeout) {&#xA;    &#x9;&#x9;    led.setPixelColor(0, returnColor);&#xA;    &#x9;&#x9;    led.show();&#xA;    &#x9;&#x9;    "/>
+          </actions>
+          <actions xsi:type="thingML:FunctionCallStatement" function="//@types.33/@functions.4">
+            <parameters xsi:type="thingML:IntegerLiteral" intValue="1000"/>
+          </actions>
+          <actions xsi:type="thingML:ExternStatement" statement="&#xA;    &#x9;&#x9;}&#xA;      &#x9;&#x9;"/>
+        </action>
+      </internal>
+      <internal>
+        <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.33/@ports.1" message="//@types.27/@messages.0"/>
+        <action xsi:type="thingML:ActionBlock">
+          <actions xsi:type="thingML:ExternStatement" statement="&#xA;&#xA;    &#x9;&#x9;uint32_t flashColor;&#xA;    &#x9;&#x9;int8_t priority;&#xA;&#xA;    &#x9;&#x9;switch(">
+            <segments xsi:type="thingML:EventReference" receiveMsg="//@types.33/@behaviour.0/@internal.2/@event.0" parameter="//@types.27/@messages.0/@parameters.0"/>
+            <segments xsi:type="thingML:ExternExpression" expression=") {&#xA;    &#x9;&#x9;&#x9;case 0:  flashColor = RED;           priority = 1; break;&#xA;    &#x9;&#x9;&#x9;case 1:  flashColor = BLUE;          priority = 0; break;&#xA;    &#x9;&#x9;&#x9;case 2:  flashColor = LIME;          priority = 1; break;&#xA;    &#x9;&#x9;&#x9;case 3:  flashColor = LAVENDER;      priority =-1; break;&#xA;    &#x9;&#x9;&#x9;case 4:  flashColor = DARK_GREEN;    priority = 4; break;&#xA;    &#x9;&#x9;&#x9;case 5:  flashColor = DARK_GREEN;    priority = 3; break;&#xA;    &#x9;&#x9;&#x9;case 6:  flashColor = DARK_RED;      priority = 3; break;&#xA;    &#x9;&#x9;&#x9;case 7:  flashColor = DARK_RED;      priority = 4; break;&#xA;    &#x9;&#x9;&#x9;case 8:  flashColor = GREEN;         priority = 2; break;&#xA;    &#x9;&#x9;&#x9;case 9:  flashColor = RED;           priority = 2; break;&#xA;    &#x9;&#x9;&#x9;case 10: flashColor = YELLOW;        priority = 0; break;&#xA;    &#x9;&#x9;&#x9;case 11: flashColor = BROWN;         priority = 1; break;&#xA;    &#x9;&#x9;&#x9;case 12: flashColor = CIAN;          priority = 0; break;&#xA;    &#x9;&#x9;&#x9;case 13: flashColor = DARK_GREEN;    priority = 0; break;&#xA;    &#x9;&#x9;&#x9;case 14: flashColor = PURPLE;        priority =-1; break;&#xA;    &#x9;&#x9;&#x9;case 15: flashColor = GREY;          priority = 0; break;&#xA;    &#x9;&#x9;&#x9;default: flashColor = BLACK;         priority = 0;&#xA;        &#x9;}&#xA;        &#x9;if (!timeout || priority > timeoutPriority) {&#xA;        &#x9;    timeoutPriority = priority;&#xA;        &#x9;    uint16_t duration = priority > 0 ? 600 : 100;"/>
+          </actions>
+          <actions xsi:type="thingML:FunctionCallStatement" function="//@types.33/@functions.2">
+            <parameters xsi:type="thingML:ExternExpression" expression="flashColor"/>
+            <parameters xsi:type="thingML:ExternExpression" expression="duration+100"/>
+          </actions>
+          <actions xsi:type="thingML:FunctionCallStatement" function="//@types.33/@functions.4">
+            <parameters xsi:type="thingML:ExternExpression" expression="duration"/>
+          </actions>
+          <actions xsi:type="thingML:ExternStatement" statement="}"/>
+        </action>
+      </internal>
+      <substate name="Idle">
+        <entry xsi:type="thingML:ActionBlock"/>
+      </substate>
+    </behaviour>
+  </types>
+  <types xsi:type="thingML:Thing" name="eCalibrationStorer" fragment="true">
+    <messages name="load"/>
+    <messages name="endload"/>
+    <messages name="errorload"/>
+    <messages name="save"/>
+  </types>
+  <types xsi:type="thingML:Thing" name="CalibrationStorer" includes="//@types.43 //@types.34">
+    <annotations name="c_header" value="&#xA;    #import &lt;calibration.hpp>&#xA;"/>
+    <annotations name="c_global" value="&#xA;    #define STORE_KEY 42&#xA;"/>
+    <messages name="storerToIdle"/>
+    <ports xsi:type="thingML:RequiredPort" name="storeReader" sends="//@types.43/@messages.0 //@types.43/@messages.1" receives="//@types.43/@messages.2 //@types.43/@messages.3"/>
+    <ports xsi:type="thingML:RequiredPort" name="storeWriter" sends="//@types.43/@messages.4 //@types.43/@messages.5" receives="//@types.43/@messages.6 //@types.43/@messages.7"/>
+    <ports xsi:type="thingML:ProvidedPort" name="storer" sends="//@types.34/@messages.1 //@types.34/@messages.2" receives="//@types.34/@messages.0 //@types.34/@messages.3"/>
+    <ports xsi:type="thingML:InternalPort" name="progress" sends="//@types.35/@messages.0" receives="//@types.35/@messages.0"/>
+    <behaviour name="Loader" initial="//@types.35/@behaviour.0/@substate.0">
+      <substate name="Idle">
+        <outgoing target="//@types.35/@behaviour.0/@substate.1">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.35/@ports.2" message="//@types.34/@messages.0"/>
+        </outgoing>
+        <outgoing target="//@types.35/@behaviour.0/@substate.2">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.35/@ports.2" message="//@types.34/@messages.3"/>
+        </outgoing>
+      </substate>
+      <substate name="Load">
+        <entry xsi:type="thingML:ActionBlock">
+          <actions xsi:type="thingML:SendAction" port="//@types.35/@ports.0" message="//@types.43/@messages.0">
+            <parameters xsi:type="thingML:IntegerLiteral"/>
+          </actions>
+        </entry>
+        <internal>
+          <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.35/@ports.0" message="//@types.43/@messages.2"/>
+          <action xsi:type="thingML:ActionBlock">
+            <actions xsi:type="thingML:ConditionalAction">
+              <condition xsi:type="thingML:EqualsExpression">
+                <lhs xsi:type="thingML:EventReference" receiveMsg="//@types.35/@behaviour.0/@substate.1/@internal.0/@event.0" parameter="//@types.43/@messages.2/@parameters.0"/>
+                <rhs xsi:type="thingML:ExternExpression" expression="STORE_KEY"/>
+              </condition>
+              <action xsi:type="thingML:SendAction" port="//@types.35/@ports.0" message="//@types.43/@messages.1"/>
+              <elseAction xsi:type="thingML:ActionBlock">
+                <actions xsi:type="thingML:SendAction" port="//@types.35/@ports.2" message="//@types.34/@messages.2"/>
+                <actions xsi:type="thingML:SendAction" port="//@types.35/@ports.3" message="//@types.35/@messages.0"/>
+              </elseAction>
+            </actions>
+          </action>
+        </internal>
+        <outgoing target="//@types.35/@behaviour.0/@substate.0">
+          <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.35/@ports.0" message="//@types.43/@messages.3"/>
+          <action xsi:type="thingML:ActionBlock">
+            <actions xsi:type="thingML:ExternStatement" statement="&#xA;                posePb = Pose({">
+              <segments xsi:type="thingML:EventReference" receiveMsg="//@types.35/@behaviour.0/@substate.1/@outgoing.0/@event.0" parameter="//@types.43/@messages.3/@parameters.0"/>
+              <segments xsi:type="thingML:ExternExpression" expression=", ">
+                <segments xsi:type="thingML:EventReference" receiveMsg="//@types.35/@behaviour.0/@substate.1/@outgoing.0/@event.0" parameter="//@types.43/@messages.3/@parameters.1"/>
+                <segments xsi:type="thingML:ExternExpression" expression=", ">
+                  <segments xsi:type="thingML:EventReference" receiveMsg="//@types.35/@behaviour.0/@substate.1/@outgoing.0/@event.0" parameter="//@types.43/@messages.3/@parameters.2"/>
+                  <segments xsi:type="thingML:ExternExpression" expression="}, {">
+                    <segments xsi:type="thingML:EventReference" receiveMsg="//@types.35/@behaviour.0/@substate.1/@outgoing.0/@event.0" parameter="//@types.43/@messages.3/@parameters.3"/>
+                    <segments xsi:type="thingML:ExternExpression" expression=", ">
+                      <segments xsi:type="thingML:EventReference" receiveMsg="//@types.35/@behaviour.0/@substate.1/@outgoing.0/@event.0" parameter="//@types.43/@messages.3/@parameters.4"/>
+                      <segments xsi:type="thingML:ExternExpression" expression=", ">
+                        <segments xsi:type="thingML:EventReference" receiveMsg="//@types.35/@behaviour.0/@substate.1/@outgoing.0/@event.0" parameter="//@types.43/@messages.3/@parameters.5"/>
+                        <segments xsi:type="thingML:ExternExpression" expression="});&#xA;                posePc = Pose({">
+                          <segments xsi:type="thingML:EventReference" receiveMsg="//@types.35/@behaviour.0/@substate.1/@outgoing.0/@event.0" parameter="//@types.43/@messages.3/@parameters.6"/>
+                          <segments xsi:type="thingML:ExternExpression" expression=", ">
+                            <segments xsi:type="thingML:EventReference" receiveMsg="//@types.35/@behaviour.0/@substate.1/@outgoing.0/@event.0" parameter="//@types.43/@messages.3/@parameters.7"/>
+                            <segments xsi:type="thingML:ExternExpression" expression=", ">
+                              <segments xsi:type="thingML:EventReference" receiveMsg="//@types.35/@behaviour.0/@substate.1/@outgoing.0/@event.0" parameter="//@types.43/@messages.3/@parameters.8"/>
+                              <segments xsi:type="thingML:ExternExpression" expression="}, {">
+                                <segments xsi:type="thingML:EventReference" receiveMsg="//@types.35/@behaviour.0/@substate.1/@outgoing.0/@event.0" parameter="//@types.43/@messages.3/@parameters.9"/>
+                                <segments xsi:type="thingML:ExternExpression" expression=", ">
+                                  <segments xsi:type="thingML:EventReference" receiveMsg="//@types.35/@behaviour.0/@substate.1/@outgoing.0/@event.0" parameter="//@types.43/@messages.3/@parameters.10"/>
+                                  <segments xsi:type="thingML:ExternExpression" expression=", ">
+                                    <segments xsi:type="thingML:EventReference" receiveMsg="//@types.35/@behaviour.0/@substate.1/@outgoing.0/@event.0" parameter="//@types.43/@messages.3/@parameters.11"/>
+                                    <segments xsi:type="thingML:ExternExpression" expression="});&#xA;&#x9;&#x9;&#x9;    pointError = 0;&#xA;&#x9;&#x9;&#x9;    calibrationFailed = false;&#xA;&#x9;&#x9;&#x9;    "/>
+                                  </segments>
+                                </segments>
+                              </segments>
+                            </segments>
+                          </segments>
+                        </segments>
+                      </segments>
+                    </segments>
+                  </segments>
+                </segments>
+              </segments>
+            </actions>
+            <actions xsi:type="thingML:SendAction" port="//@types.35/@ports.2" message="//@types.34/@messages.1"/>
+          </action>
+        </outgoing>
+        <outgoing target="//@types.35/@behaviour.0/@substate.0">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.35/@ports.3" message="//@types.35/@messages.0"/>
+        </outgoing>
+      </substate>
+      <substate name="Save">
+        <entry xsi:type="thingML:ActionBlock">
+          <actions xsi:type="thingML:SendAction" port="//@types.35/@ports.1" message="//@types.43/@messages.4">
+            <parameters xsi:type="thingML:IntegerLiteral"/>
+            <parameters xsi:type="thingML:ExternExpression" expression="STORE_KEY"/>
+          </actions>
+          <actions xsi:type="thingML:SendAction" port="//@types.35/@ports.1" message="//@types.43/@messages.5">
+            <parameters xsi:type="thingML:ExternExpression" expression="posePb.position.getX()"/>
+            <parameters xsi:type="thingML:ExternExpression" expression="posePb.position.getY()"/>
+            <parameters xsi:type="thingML:ExternExpression" expression="posePb.position.getZ()"/>
+            <parameters xsi:type="thingML:ExternExpression" expression="posePb.orientation.getX()"/>
+            <parameters xsi:type="thingML:ExternExpression" expression="posePb.orientation.getY()"/>
+            <parameters xsi:type="thingML:ExternExpression" expression="posePb.orientation.getZ()"/>
+            <parameters xsi:type="thingML:ExternExpression" expression="posePc.position.getX()"/>
+            <parameters xsi:type="thingML:ExternExpression" expression="posePc.position.getY()"/>
+            <parameters xsi:type="thingML:ExternExpression" expression="posePc.position.getZ()"/>
+            <parameters xsi:type="thingML:ExternExpression" expression="posePc.orientation.getX()"/>
+            <parameters xsi:type="thingML:ExternExpression" expression="posePc.orientation.getY()"/>
+            <parameters xsi:type="thingML:ExternExpression" expression="posePc.orientation.getZ()"/>
+          </actions>
+        </entry>
+        <outgoing target="//@types.35/@behaviour.0/@substate.0">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.35/@ports.1" message="//@types.43/@messages.7"/>
+        </outgoing>
+      </substate>
+    </behaviour>
+  </types>
+  <types xsi:type="thingML:Thing" name="eCalibrationValidator" fragment="true">
+    <messages name="validate"/>
+    <messages name="endvalidate"/>
+    <messages name="errvalidate"/>
+  </types>
+  <types xsi:type="thingML:Thing" name="CalibrationValidator" includes="//@types.36">
+    <messages name="validating"/>
+    <ports xsi:type="thingML:ProvidedPort" name="validator" sends="//@types.36/@messages.1 //@types.36/@messages.2" receives="//@types.36/@messages.0"/>
+    <ports xsi:type="thingML:InternalPort" name="avt" sends="//@types.37/@messages.0" receives="//@types.37/@messages.0"/>
+    <behaviour name="Validator" initial="//@types.37/@behaviour.0/@substate.0">
+      <substate name="Idle">
+        <outgoing name="load" target="//@types.37/@behaviour.0/@substate.0">
+          <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.37/@ports.0" message="//@types.36/@messages.0"/>
+          <action xsi:type="thingML:SendAction" port="//@types.37/@ports.0" message="//@types.36/@messages.1"/>
+        </outgoing>
+      </substate>
+    </behaviour>
+  </types>
+  <types xsi:type="thingML:Thing" name="IRMessages" fragment="true">
+    <messages name="pulseDetectedEvent">
+      <parameters name="start">
+        <typeRef type="//@types.16"/>
+      </parameters>
+      <parameters name="duration">
+        <typeRef type="//@types.16"/>
+      </parameters>
+    </messages>
+    <messages name="packageDetectedEvent">
+      <parameters name="startTimeL1">
+        <typeRef type="//@types.16"/>
+      </parameters>
+      <parameters name="startTimeL2">
+        <typeRef type="//@types.16"/>
+      </parameters>
+      <parameters name="durationL1">
+        <typeRef type="//@types.16"/>
+      </parameters>
+      <parameters name="durationL2">
+        <typeRef type="//@types.16"/>
+      </parameters>
+      <parameters name="signal">
+        <typeRef type="//@types.16"/>
+      </parameters>
+    </messages>
+    <messages name="allAngles">
+      <parameters name="bh">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="bv">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="ch">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="cv">
+        <typeRef type="//@types.20"/>
+      </parameters>
+    </messages>
+    <messages name="timerOverflow"/>
+  </types>
+  <types xsi:type="thingML:Thing" name="StatusMessages" fragment="true">
+    <messages name="status">
+      <parameters name="id">
+        <typeRef type="//@types.13"/>
+      </parameters>
+    </messages>
+    <messages name="currentState">
+      <parameters name="id">
+        <typeRef type="//@types.13"/>
+      </parameters>
+    </messages>
+    <messages name="startPrinting"/>
+    <messages name="stopPrinting"/>
+  </types>
+  <types xsi:type="thingML:Thing" name="ButtonMsgs" fragment="true">
+    <messages name="press"/>
+    <messages name="release"/>
+  </types>
+  <types xsi:type="thingML:Thing" name="TimerMessages" fragment="true">
+    <messages name="ms25_tic"/>
+  </types>
+  <types xsi:type="thingML:Thing" name="Button" includes="//@types.40 //@types.41">
+    <annotations name="c_header" value="#include &lt;Timer.h>"/>
+    <annotations name="c_global" value="extern struct Button_Instance button_var;"/>
+    <ports xsi:type="thingML:InternalPort" name="clock" sends="//@types.41/@messages.0" receives="//@types.41/@messages.0"/>
+    <ports xsi:type="thingML:ProvidedPort" name="evt" sends="//@types.40/@messages.0 //@types.40/@messages.1"/>
+    <properties name="PIN">
+      <typeRef type="//@types.13"/>
+      <init xsi:type="thingML:IntegerLiteral" intValue="7"/>
+    </properties>
+    <functions name="is_pressed">
+      <typeRef type="//@types.12"/>
+      <body xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ReturnAction">
+          <exp xsi:type="thingML:ExternExpression" expression="1 - digitalRead(">
+            <segments xsi:type="thingML:PropertyReference" property="//@types.42/@properties.0"/>
+            <segments xsi:type="thingML:ExternExpression" expression=")"/>
+          </exp>
+        </actions>
+      </body>
+    </functions>
+    <functions name="time_25ms">
+      <annotations name="c_prototype" value="void time_25ms()"/>
+      <body xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="Button_send_clock_ms25_tic(&amp;button_var);"/>
+        <actions xsi:type="thingML:ExternStatement" statement="start_timer(0, 25, &amp;time_25ms);"/>
+      </body>
+    </functions>
+    <behaviour name="Button" initial="//@types.42/@behaviour.0/@substate.0">
+      <entry xsi:type="thingML:ActionBlock">
+        <actions xsi:type="thingML:ExternStatement" statement="pinMode(">
+          <segments xsi:type="thingML:PropertyReference" property="//@types.42/@properties.0"/>
+          <segments xsi:type="thingML:ExternExpression" expression=", INPUT_PULLUP);&#xA;&#x9;&#x9;&#x9;initialize_timer();&#xA;&#x9;&#x9;&#x9;start_timer(0, 125, &amp;time_25ms);"/>
+        </actions>
+      </entry>
+      <substate name="RELEASED">
+        <outgoing name="status" target="//@types.42/@behaviour.0/@substate.1">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.42/@ports.0" message="//@types.41/@messages.0"/>
+          <guard xsi:type="thingML:FunctionCallExpression" function="//@types.42/@functions.0"/>
+          <action xsi:type="thingML:SendAction" port="//@types.42/@ports.1" message="//@types.40/@messages.0"/>
+        </outgoing>
+      </substate>
+      <substate name="PRESSED">
+        <outgoing name="status" target="//@types.42/@behaviour.0/@substate.0">
+          <event xsi:type="thingML:ReceiveMessage" port="//@types.42/@ports.0" message="//@types.41/@messages.0"/>
+          <guard xsi:type="thingML:NotExpression">
+            <term xsi:type="thingML:FunctionCallExpression" function="//@types.42/@functions.0"/>
+          </guard>
+          <action xsi:type="thingML:SendAction" port="//@types.42/@ports.1" message="//@types.40/@messages.1"/>
+        </outgoing>
+      </substate>
+    </behaviour>
+  </types>
+  <types xsi:type="thingML:Thing" name="StoreMessages" fragment="true">
+    <messages name="readByte">
+      <parameters name="id">
+        <typeRef type="//@types.13"/>
+      </parameters>
+    </messages>
+    <messages name="readConfig"/>
+    <messages name="byteRead">
+      <parameters name="val">
+        <typeRef type="//@types.13"/>
+      </parameters>
+    </messages>
+    <messages name="configRead">
+      <parameters name="bx">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="by">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="bz">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="brx">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="bry">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="brz">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="cx">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="cy">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="cz">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="crx">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="cry">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="crz">
+        <typeRef type="//@types.20"/>
+      </parameters>
+    </messages>
+    <messages name="writeByte">
+      <parameters name="id">
+        <typeRef type="//@types.13"/>
+      </parameters>
+      <parameters name="val">
+        <typeRef type="//@types.13"/>
+      </parameters>
+    </messages>
+    <messages name="writeConfig">
+      <parameters name="bx">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="by">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="bz">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="brx">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="bry">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="brz">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="cx">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="cy">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="cz">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="crx">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="cry">
+        <typeRef type="//@types.20"/>
+      </parameters>
+      <parameters name="crz">
+        <typeRef type="//@types.20"/>
+      </parameters>
+    </messages>
+    <messages name="byteWritten"/>
+    <messages name="configWritten"/>
+  </types>
+  <types xsi:type="thingML:Thing" name="Storer" includes="//@types.43">
+    <annotations name="c_header" value="&#xA;    #include &lt;constants.h>&#xA;    &#xA;#include &lt;inttypes.h>&#xA;#include &lt;avr/eeprom.h>&#xA;#include &lt;avr/io.h>&#xA;"/>
+    <ports xsi:type="thingML:ProvidedPort" name="reader" sends="//@types.43/@messages.2 //@types.43/@messages.3" receives="//@types.43/@messages.0 //@types.43/@messages.1"/>
+    <ports xsi:type="thingML:ProvidedPort" name="writer" sends="//@types.43/@messages.6 //@types.43/@messages.7" receives="//@types.43/@messages.4 //@types.43/@messages.5"/>
+    <behaviour name="EESave" initial="//@types.44/@behaviour.0/@substate.0">
+      <substate name="Idle">
+        <internal>
+          <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.44/@ports.0" message="//@types.43/@messages.0"/>
+          <action xsi:type="thingML:ActionBlock">
+            <actions xsi:type="thingML:SendAction" port="//@types.44/@ports.0" message="//@types.43/@messages.2">
+              <parameters xsi:type="thingML:ExternExpression" expression="eeprom_read_byte((uint8_t*) ">
+                <segments xsi:type="thingML:EventReference" receiveMsg="//@types.44/@behaviour.0/@substate.0/@internal.0/@event.0" parameter="//@types.43/@messages.0/@parameters.0"/>
+                <segments xsi:type="thingML:ExternExpression" expression=")"/>
+              </parameters>
+            </actions>
+          </action>
+        </internal>
+        <internal>
+          <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.44/@ports.0" message="//@types.43/@messages.1"/>
+          <action xsi:type="thingML:ActionBlock">
+            <actions xsi:type="thingML:ExternStatement" statement="&#xA;    &#x9;&#x9;&#x9;udouble ud; &#xA;    &#x9;&#x9;&#x9;for (int i = 0; i &lt; 96; i++) {&#xA;    &#x9;&#x9;&#x9;&#x9;ud.b[i] = eeprom_read_byte((uint8_t*) i+1);&#xA;    &#x9;&#x9;&#x9;}"/>
+            <actions xsi:type="thingML:SendAction" port="//@types.44/@ports.0" message="//@types.43/@messages.3">
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[0]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[1]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[2]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[3]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[4]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[5]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[6]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[7]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[8]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[9]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[10]"/>
+              <parameters xsi:type="thingML:ExternExpression" expression="ud.d[11]"/>
+            </actions>
+          </action>
+        </internal>
+        <internal>
+          <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.44/@ports.1" message="//@types.43/@messages.4"/>
+          <action xsi:type="thingML:ActionBlock">
+            <actions xsi:type="thingML:ExternStatement" statement="&#xA;        &#x9;&#x9;if(">
+              <segments xsi:type="thingML:EventReference" receiveMsg="//@types.44/@behaviour.0/@substate.0/@internal.2/@event.0" parameter="//@types.43/@messages.4/@parameters.1"/>
+              <segments xsi:type="thingML:ExternExpression" expression=" != eeprom_read_byte((uint8_t*) ">
+                <segments xsi:type="thingML:EventReference" receiveMsg="//@types.44/@behaviour.0/@substate.0/@internal.2/@event.0" parameter="//@types.43/@messages.4/@parameters.0"/>
+                <segments xsi:type="thingML:ExternExpression" expression="))&#x9;eeprom_write_byte((uint8_t*) ">
+                  <segments xsi:type="thingML:EventReference" receiveMsg="//@types.44/@behaviour.0/@substate.0/@internal.2/@event.0" parameter="//@types.43/@messages.4/@parameters.0"/>
+                  <segments xsi:type="thingML:ExternExpression" expression=",">
+                    <segments xsi:type="thingML:EventReference" receiveMsg="//@types.44/@behaviour.0/@substate.0/@internal.2/@event.0" parameter="//@types.43/@messages.4/@parameters.1"/>
+                    <segments xsi:type="thingML:ExternExpression" expression=");"/>
+                  </segments>
+                </segments>
+              </segments>
+            </actions>
+            <actions xsi:type="thingML:SendAction" port="//@types.44/@ports.1" message="//@types.43/@messages.6"/>
+          </action>
+        </internal>
+        <internal>
+          <event xsi:type="thingML:ReceiveMessage" name="m" port="//@types.44/@ports.1" message="//@types.43/@messages.5"/>
+          <action xsi:type="thingML:ActionBlock">
+            <actions xsi:type="thingML:ExternStatement" statement="&#xA;&#x9;&#x9;&#x9;&#xA;&#x9;&#x9;&#x9;    udouble data;&#xA;&#x9;&#x9;&#x9;    data.d[0] = ">
+              <segments xsi:type="thingML:EventReference" receiveMsg="//@types.44/@behaviour.0/@substate.0/@internal.3/@event.0" parameter="//@types.43/@messages.5/@parameters.0"/>
+              <segments xsi:type="thingML:ExternExpression" expression=";&#xA;&#x9;&#x9;&#x9;    data.d[1] = ">
+                <segments xsi:type="thingML:EventReference" receiveMsg="//@types.44/@behaviour.0/@substate.0/@internal.3/@event.0" parameter="//@types.43/@messages.5/@parameters.1"/>
+                <segments xsi:type="thingML:ExternExpression" expression=";&#xA;&#x9;&#x9;&#x9;    data.d[2] = ">
+                  <segments xsi:type="thingML:EventReference" receiveMsg="//@types.44/@behaviour.0/@substate.0/@internal.3/@event.0" parameter="//@types.43/@messages.5/@parameters.2"/>
+                  <segments xsi:type="thingML:ExternExpression" expression=";&#xA;&#x9;&#x9;&#x9;    data.d[3] = ">
+                    <segments xsi:type="thingML:EventReference" receiveMsg="//@types.44/@behaviour.0/@substate.0/@internal.3/@event.0" parameter="//@types.43/@messages.5/@parameters.3"/>
+                    <segments xsi:type="thingML:ExternExpression" expression=";&#xA;&#x9;&#x9;&#x9;    data.d[4] = ">
+                      <segments xsi:type="thingML:EventReference" receiveMsg="//@types.44/@behaviour.0/@substate.0/@internal.3/@event.0" parameter="//@types.43/@messages.5/@parameters.4"/>
+                      <segments xsi:type="thingML:ExternExpression" expression=";&#xA;&#x9;&#x9;&#x9;    data.d[5] = ">
+                        <segments xsi:type="thingML:EventReference" receiveMsg="//@types.44/@behaviour.0/@substate.0/@internal.3/@event.0" parameter="//@types.43/@messages.5/@parameters.5"/>
+                        <segments xsi:type="thingML:ExternExpression" expression=";&#xA;&#x9;&#x9;&#x9;    data.d[6] = ">
+                          <segments xsi:type="thingML:EventReference" receiveMsg="//@types.44/@behaviour.0/@substate.0/@internal.3/@event.0" parameter="//@types.43/@messages.5/@parameters.6"/>
+                          <segments xsi:type="thingML:ExternExpression" expression=";&#xA;&#x9;&#x9;&#x9;    data.d[7] = ">
+                            <segments xsi:type="thingML:EventReference" receiveMsg="//@types.44/@behaviour.0/@substate.0/@internal.3/@event.0" parameter="//@types.43/@messages.5/@parameters.7"/>
+                            <segments xsi:type="thingML:ExternExpression" expression=";&#xA;&#x9;&#x9;&#x9;    data.d[8] = ">
+                              <segments xsi:type="thingML:EventReference" receiveMsg="//@types.44/@behaviour.0/@substate.0/@internal.3/@event.0" parameter="//@types.43/@messages.5/@parameters.8"/>
+                              <segments xsi:type="thingML:ExternExpression" expression=";&#xA;&#x9;&#x9;&#x9;    data.d[9] = ">
+                                <segments xsi:type="thingML:EventReference" receiveMsg="//@types.44/@behaviour.0/@substate.0/@internal.3/@event.0" parameter="//@types.43/@messages.5/@parameters.9"/>
+                                <segments xsi:type="thingML:ExternExpression" expression=";&#xA;&#x9;&#x9;&#x9;    data.d[10] = ">
+                                  <segments xsi:type="thingML:EventReference" receiveMsg="//@types.44/@behaviour.0/@substate.0/@internal.3/@event.0" parameter="//@types.43/@messages.5/@parameters.10"/>
+                                  <segments xsi:type="thingML:ExternExpression" expression=";&#xA;&#x9;&#x9;&#x9;    data.d[11] = ">
+                                    <segments xsi:type="thingML:EventReference" receiveMsg="//@types.44/@behaviour.0/@substate.0/@internal.3/@event.0" parameter="//@types.43/@messages.5/@parameters.11"/>
+                                    <segments xsi:type="thingML:ExternExpression" expression=";&#xA;&#x9;&#x9;&#x9;    &#x9;&#x9;&#x9;    &#xA;&#x9;&#x9;&#x9;    for (int i = 0; i &lt; 96; i++) {&#xA;                    if(data.b[i] != eeprom_read_byte((uint8_t*) i+1))&#x9;eeprom_write_byte((uint8_t*) i+1, data.b[i]);&#xA;                }"/>
+                                  </segments>
+                                </segments>
+                              </segments>
+                            </segments>
+                          </segments>
+                        </segments>
+                      </segments>
+                    </segments>
+                  </segments>
+                </segments>
+              </segments>
+            </actions>
+            <actions xsi:type="thingML:SendAction" port="//@types.44/@ports.1" message="//@types.43/@messages.7"/>
+          </action>
+        </internal>
+      </substate>
+    </behaviour>
+  </types>
+  <configs name="Teensy_IRPS">
+    <annotations name="teensy_corepath" value="../../../../c/lib/core/teensy3"/>
+    <annotations name="teensy_externpath" value="../../../../c/utils"/>
+    <annotations name="teensy_libpath" value="../../../../c/lib/Adafruit_NeoPixel"/>
+    <annotations name="teensy_fifosize" value="512"/>
+    <instances name="button" type="//@types.42"/>
+    <instances name="softButton" type="//@types.32"/>
+    <instances name="blinker" type="//@types.33"/>
+    <instances name="serial" type="//@types.30"/>
+    <instances name="serialIn" type="//@types.31"/>
+    <instances name="pulseReader" type="//@types.2"/>
+    <instances name="packageReader" type="//@types.3"/>
+    <instances name="angleReader" type="//@types.4"/>
+    <instances name="backbone" type="//@types.1"/>
+    <instances name="runner" type="//@types.6"/>
+    <instances name="calibrator" type="//@types.9"/>
+    <instances name="calibrationStorer" type="//@types.35"/>
+    <instances name="storer" type="//@types.44"/>
+    <instances name="calibrationValidator" type="//@types.37"/>
+    <connectors xsi:type="thingML:Connector" cli="//@configs.0/@instances.1" required="//@types.32/@ports.0" srv="//@configs.0/@instances.0" provided="//@types.42/@ports.1"/>
+    <connectors xsi:type="thingML:Connector" cli="//@configs.0/@instances.8" required="//@types.1/@ports.9" srv="//@configs.0/@instances.1" provided="//@types.32/@ports.2"/>
+    <connectors xsi:type="thingML:Connector" cli="//@configs.0/@instances.8" required="//@types.1/@ports.6" srv="//@configs.0/@instances.3" provided="//@types.30/@ports.0"/>
+    <connectors xsi:type="thingML:Connector" cli="//@configs.0/@instances.8" required="//@types.1/@ports.7" srv="//@configs.0/@instances.4" provided="//@types.31/@ports.0"/>
+    <connectors xsi:type="thingML:Connector" cli="//@configs.0/@instances.8" required="//@types.1/@ports.10" srv="//@configs.0/@instances.6" provided="//@types.3/@ports.2"/>
+    <connectors xsi:type="thingML:Connector" cli="//@configs.0/@instances.8" required="//@types.1/@ports.10" srv="//@configs.0/@instances.7" provided="//@types.4/@ports.3"/>
+    <connectors xsi:type="thingML:Connector" cli="//@configs.0/@instances.8" required="//@types.1/@ports.10" srv="//@configs.0/@instances.10" provided="//@types.9/@ports.1"/>
+    <connectors xsi:type="thingML:Connector" cli="//@configs.0/@instances.8" required="//@types.1/@ports.10" srv="//@configs.0/@instances.9" provided="//@types.6/@ports.1"/>
+    <connectors xsi:type="thingML:Connector" cli="//@configs.0/@instances.8" required="//@types.1/@ports.8" srv="//@configs.0/@instances.2" provided="//@types.33/@ports.1"/>
+    <connectors xsi:type="thingML:Connector" cli="//@configs.0/@instances.5" required="//@types.2/@ports.0" srv="//@configs.0/@instances.6" provided="//@types.3/@ports.0"/>
+    <connectors xsi:type="thingML:Connector" cli="//@configs.0/@instances.6" required="//@types.3/@ports.1" srv="//@configs.0/@instances.7" provided="//@types.4/@ports.0"/>
+    <connectors xsi:type="thingML:Connector" cli="//@configs.0/@instances.8" required="//@types.1/@ports.1" srv="//@configs.0/@instances.7" provided="//@types.4/@ports.1"/>
+    <connectors xsi:type="thingML:Connector" cli="//@configs.0/@instances.5" required="//@types.2/@ports.1" srv="//@configs.0/@instances.7" provided="//@types.4/@ports.2"/>
+    <connectors xsi:type="thingML:Connector" cli="//@configs.0/@instances.8" required="//@types.1/@ports.2" srv="//@configs.0/@instances.9" provided="//@types.6/@ports.0"/>
+    <connectors xsi:type="thingML:Connector" cli="//@configs.0/@instances.8" required="//@types.1/@ports.5" srv="//@configs.0/@instances.10" provided="//@types.9/@ports.0"/>
+    <connectors xsi:type="thingML:Connector" cli="//@configs.0/@instances.8" required="//@types.1/@ports.3" srv="//@configs.0/@instances.11" provided="//@types.35/@ports.2"/>
+    <connectors xsi:type="thingML:Connector" cli="//@configs.0/@instances.11" required="//@types.35/@ports.1" srv="//@configs.0/@instances.12" provided="//@types.44/@ports.1"/>
+    <connectors xsi:type="thingML:Connector" cli="//@configs.0/@instances.11" required="//@types.35/@ports.0" srv="//@configs.0/@instances.12" provided="//@types.44/@ports.0"/>
+    <connectors xsi:type="thingML:Connector" cli="//@configs.0/@instances.8" required="//@types.1/@ports.4" srv="//@configs.0/@instances.13" provided="//@types.37/@ports.0"/>
+  </configs>
+</thingML:ThingMLModel>

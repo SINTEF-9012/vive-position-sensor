@@ -1,0 +1,15 @@
+@startuml
+skinparam defaultTextAlignment left
+caption Behavior of thing Blinker
+[*] --> BlinkerState
+state BlinkerState{
+state Idle{
+	Idle : entry / 
+}
+[*] --> Idle
+	BlinkerState : entry / do \n'pinMode(13, OUTPUT);\n    				 led.setBrightness(BRIGHTNESS);\n					 led.begin();\n					 led.show();\n    				 '\nstartLEDFlashAfterDuration(1000)\nend\n
+	BlinkerState : m:evt?blink / \naction '\n		    digitalWriteFast(13, current_blink);\n    		current_blink = (current_blink == HIGH)? LOW : HIGH;\n    	    '\n
+	BlinkerState : m:neopixel?stateID / \naction do \n'\n\n    		switch(' & stateID.id & ') {\n    		    case 0: returnColor = WHITE; break;  // Idle\n    		    case 1: returnColor = ORANGE; break; // LoadCalibration\n    		    case 2: returnColor = YELLOW; break; // Calibration\n    		    case 3: returnColor = ORANGE; break; // Validate_Calibration\n    		    case 4: returnColor = GREEN; break;  // Runner\n    		    default: returnColor = BLUE;\n    		}\n\n    		if (!timeout) {\n    		    led.setPixelColor(0, returnColor);\n    		    led.show();\n    		    '\ntimeoutColorChangeForDuration(1000)\n'\n    		}\n      		'\nend\n
+	BlinkerState : m:neopixel?statusID / \naction do \n'\n\n    		uint32_t flashColor;\n    		int8_t priority;\n\n    		switch(' & statusID.id & ') {\n    			case 0:  flashColor = RED;           priority = 0; break;\n    			case 1:  flashColor = ORANGE;        priority = 0; break;\n    			case 2:  flashColor = BLUE;          priority = 0; break;\n    			case 3:  flashColor = LIGHT_GREEN;   priority =-1; break;\n    			case 4:  flashColor = DARK_GREEN;    priority = 3; break;\n    			case 5:  flashColor = DARK_GREEN;    priority = 2; break;\n    			case 6:  flashColor = RED;           priority = 2; break;\n    			case 7:  flashColor = RED;           priority = 3; break;\n    			case 8:  flashColor = LIME;          priority = 1; break;\n    			case 9:  flashColor = BLUE;          priority = 1; break;\n    			case 10: flashColor = LIGHT_GREEN;   priority = 0; break;\n    			case 11: flashColor = BROWN;         priority = 0; break;\n    			case 12: flashColor = RED;           priority = 0; break;\n    			case 13: flashColor = GREEN;         priority = 0; break;\n    			case 14: flashColor = BLACK;         priority = 0; break;\n    			case 15: flashColor = LAVENDER;      priority = 0; break;\n    			default: flashColor = BLACK;         priority = 0;\n        	}\n        	if (!timeout || priority > timeoutPriority) {\n        	    timeoutPriority = priority;\n        	    uint16_t duration = 300*(1+priority);'\nsetColorForDuration(...)\ntimeoutColorChangeForDuration('duration')\n'}'\nend\n
+}
+@enduml

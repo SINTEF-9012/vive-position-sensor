@@ -1,0 +1,27 @@
+@startuml
+skinparam defaultTextAlignment left
+caption Behavior of thing SoftButton
+[*] --> SoftButtonImpl
+state SoftButtonImpl{
+state Idle{
+
+Idle --> Pressed : m:Button?press
+}
+state Pressed{
+	Pressed : entry / 'start_timer(1, ' & long_delay & ', &timeout_button);'\n
+	Pressed : exit / 'timer_cancel(1);'\n
+
+Pressed --> Idle : Timer?timer_timeout\naction SoftButton!long_press()\n
+
+Pressed --> Released : Button?release
+}
+state Released{
+	Released : entry / 'start_timer(1, ' & double_delay & ', &timeout_button);'\n
+	Released : exit / 'timer_cancel(1);'\n
+
+
+Released --> Idle : Button?press\naction SoftButton!double_click()\n\n||Timer?timer_timeout\naction SoftButton!click()\n
+}
+[*] --> Idle
+}
+@enduml

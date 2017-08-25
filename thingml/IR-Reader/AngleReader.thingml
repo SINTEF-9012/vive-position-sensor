@@ -1,0 +1,327 @@
+import "../../_Datatypes.thingml"
+import "../Messages.thingml"
+
+
+thing AngleReader includes IRMessages, StatusMessages
+
+    @c_header "
+        #include <constants.h>
+        
+        enum SignalType {
+            // b - master, c - slave
+            // h - horisontal, v - vertical
+            bh = 0, bv = 1, ch = 2, cv = 3, error = 4
+        };
+    "
+    
+    @c_global "
+    
+        // Last package arrays
+        uint32_t L1s [STORED_STEPS];
+        uint32_t L2s [STORED_STEPS];
+        int signalIndex = 0;
+        
+        double signalAngles[4];         // Last read angles sufficiently close to its own previous value
+        double lastSignalAngles[4];     // Last read angles
+        
+        uint32_t lastStartTime = 0;
+        
+        uint32_t calibrationStartTime;
+        int calibrationStep = 0;
+        int initiationCount = 0;
+        int recalibrateCount = 0;
+        
+        int printWhenZero = 0;         // Only print when we have gotten four consecutive angles
+        
+        enum Signal {
+            off = 0, horisontal = 1, vertical = 2
+        };
+        
+        uint32_t average(uint32_t L[], int count) {
+            uint32_t sum = 0;
+        
+            for (int i = 0; i < count; i++) {
+                sum += L[i];
+            }
+            return sum/count;
+        }
+        
+        uint32_t maxVal(uint32_t L[], int count) {
+            uint32_t ret = L[0];
+            for (int i = 1; i<count; i++) {
+                if (L[i] > ret) {
+                    ret = L[i];
+                }
+            }
+            return ret;
+        }
+        
+        uint32_t minVal(uint32_t L[], int count) {
+            uint32_t ret = L[0];
+            for (int i = 1; i<count; i++) {
+                if (L[i] < ret) {
+                    ret = L[i];
+                }
+            }
+            return ret;
+        }
+        
+        Signal classifyPulse(uint32_t signal, uint32_t L[], int count) {
+        
+            int min = minVal(L, count);
+            int max = maxVal(L, count);
+        
+            int category = (7*(signal - min + PULSE_WIDTH_SEPARATION/2))/(max - min);
+            
+            switch (category) {
+                case 0:
+                    return Signal::horisontal;
+                    break;
+                case 1:
+                    return Signal::vertical;
+                    break;
+                case 2:
+                    return Signal::horisontal;
+                    break;
+                case 3:
+                    return Signal::vertical;
+                    break;
+                default:
+                    return Signal::off;
+                    break;
+            }
+        
+            return Signal::off;   
+        }
+        
+        SignalType identifySignal(Signal L1, Signal L2) {
+            return (L1 == Signal::off) ? (L2 == Signal::horisontal) ? SignalType::ch:(L2 == Signal::vertical) ? SignalType::cv : SignalType::error : (L2 == Signal::off) ? (L1 == Signal::horisontal) ? SignalType::bh : (L1 == Signal::vertical) ? SignalType::bv : SignalType::error : SignalType::error;
+        }
+    "
+{
+    provided port PackageReceiver {
+        receives packageDetectedEvent
+    }
+    
+    provided port AngleSender {
+        sends allAngles
+    }
+    
+    provided port OverflowNotifier {
+        receives timerOverflow
+    }
+    
+    provided port StatusSender {
+        sends status
+    }   
+    
+    
+    message startTimeCalibrated()
+    message recalibrate()
+    
+    internal port Transitions {
+        sends startTimeCalibrated, recalibrate
+        receives startTimeCalibrated, recalibrate
+    }
+    
+    
+    statechart SingalDetectionStrategy init PulseWidths {
+        
+        internal event OverflowNotifier?timerOverflow action do
+            // We wish to have overflow in computation, ignore compiler warning
+            'calibrationStartTime = (calibrationStartTime + (PERIODS_PER_CLOCK+1) * PERIOD * 4) % (PERIOD * 4);
+            
+            if (DEBUG && !VERBOSE) {
+                Serial.print("\nTimer overflow occured. ");
+            }
+            
+            '
+        end
+        
+        state PulseWidths {
+            
+            on entry StatusSender!status(12)
+            
+            internal event a : PackageReceiver?packageDetectedEvent action do
+                
+                updateLastPackageArrays(a.durationL1, a.durationL2)
+                
+                '
+                if (initiationCount >= STORED_STEPS) {
+                    Signal L1Type = classifyPulse('&a.durationL1&', L1s, STORED_STEPS);
+                    Signal L2Type = classifyPulse('&a.durationL2&', L2s, STORED_STEPS);
+    
+                    SignalType signalType = identifySignal(L1Type, L2Type);
+                    
+                    if (calibrationStep % 4 == signalType) {
+                        calibrationStep++;
+                    } else {
+                        calibrationStep = 0;
+                    }
+                    
+                    if (calibrationStep == CALIBRATION_SAMPLES * 4 + 1) {'
+                        Transitions!startTimeCalibrated()
+                        'calibrationStartTime = '&a.startTimeL1&' % (PERIOD * 4);
+                    }
+                    '
+                    
+                    updateAngles(a.signal, 'signalType', a.startTimeL2 - a.startTimeL1, false)
+                    AngleSender!allAngles('signalAngles[0]', 'signalAngles[1]', 'signalAngles[2]', 'signalAngles[3]')
+                    
+                    'if (DEBUG && VERBOSE) {'
+                        printAngleInformation(a.durationL1, a.durationL2)
+                    '}
+                } else {
+                    initiationCount++;
+                }'
+                
+            end
+            
+            transition -> ArrivalTime event Transitions?startTimeCalibrated
+        }
+        
+        state ArrivalTime {
+            
+            on entry StatusSender!status(13)
+            
+            internal event a: PackageReceiver?packageDetectedEvent action do
+                
+                '
+                // Handle first few pulses in signal that arrive "before" startTime (after foverflow)
+                uint32_t startTime = '&a.startTimeL1&' < calibrationStartTime ? '&a.startTimeL1&' += 4*PERIOD : '&a.startTimeL1&';
+                
+                // Send event if one or more angles have not been read
+                uint32_t diff = startTime - lastStartTime;
+                if (!(MIN_PACKAGE_SEPARATION < diff && diff < MAX_PACKAGE_SEPARATION)) {
+                    printWhenZero = 4; // Wait until this angle-measurnment arrives next (in four itterations). '
+                    StatusSender!status(1)
+                '}
+                lastStartTime = startTime;
+                
+                // Classify package
+                int val = ((startTime-calibrationStartTime + PERIOD/2) / PERIOD) % 4;
+                SignalType signalType = SignalType(val);
+        
+                // Handle timing drift (from teensy or Base Stations)
+                double n = (double) (startTime-calibrationStartTime)/(PERIOD);
+                double difference = n - (long)n;
+        
+                if (difference < TIME_DRIFT_CORRECTOIN_THRESHOLD) {
+                    calibrationStartTime += TIME_DRIFT_CORRECTOIN_CONSTANT;
+                } else if (1-TIME_DRIFT_CORRECTOIN_THRESHOLD < difference) {
+                    calibrationStartTime -= TIME_DRIFT_CORRECTOIN_CONSTANT;
+                } else {
+                    if (recalibrateCount++ > RECALIBRATE_SAMPLES) {'
+                        Transitions!recalibrate()
+                        StatusSender!status(11)
+                    '} else {'
+                        StatusSender!status(10)
+                    '}
+                    return;
+                }
+                if (recalibrateCount != 0) recalibrateCount = 0;
+                '
+                
+                updateAngles(a.signal, 'signalType', a.startTimeL2 - a.startTimeL1, true)
+                'if (printWhenZero == 0) {' // Only print when 4 consecutive angles have been received
+                    AngleSender!allAngles('signalAngles[0]', 'signalAngles[1]', 'signalAngles[2]', 'signalAngles[3]')
+                '} else {
+                    printWhenZero--;
+                } 
+                
+                if (DEBUG && VERBOSE) {'
+                    printAngleInformation(a.durationL1, a.durationL2)
+                '}'
+                
+            end
+            
+            transition -> PulseWidths event Transitions?recalibrate
+            
+        }
+    }
+    
+    /**
+     * Updates the singeAngle array with information from the last angle read. 
+     * Side effects: 
+     * - Updates the signalAngle-array if signal is deemed valid
+     * - Updates the lastSingalAngle-array for measured angles
+     */
+    function updateAngles(inputSignal: UInt32, signalType: UInt8, L2delay: UInt32, calibrated: Boolean) do
+        '
+        SignalType type = SignalType('&signalType&');
+        uint32_t signal = (type == SignalType::bh || type == SignalType::bv) ? '&inputSignal&' : '&inputSignal - L2delay&';
+        
+        double signalAngleMag = PI * ((double) signal)/PERIOD - PI/2;
+        double signalAngle = (type == SignalType::bh || type == SignalType::ch) ? -signalAngleMag : signalAngleMag;
+        
+        // Account for observed deviation in angle measurnment 
+        //signalAngle = signalAngle*(1.0-0.00455);
+        
+        if (type == SignalType::error) {
+            'StatusSender!status(15)'
+            
+        } else {
+           
+            if (abs(signalAngle - lastSignalAngles[type]) < MAX_VALID_ANGLE_DIFFERENCE) {
+                 signalAngles[type] = signalAngle;  // Only print angle for consecutive simular angles
+            } 
+           
+            lastSignalAngles[type] = signalAngle;   // Record last measured angle regardless
+        }
+        
+        if (DEBUG && VERBOSE) {
+            if ('&calibrated&') {
+                Serial.print("\nD,");
+                Serial.print(type);
+                Serial.print(",");
+                Serial.print(signalAngle,6);
+                Serial.print(",");
+            }
+            
+            if (type == SignalType::bh) {
+                Serial.print("\nE,");
+                Serial.print(signalAngles[0],6);
+                Serial.print(",");
+                Serial.print(signalAngles[1],6);
+                Serial.print(",");
+                Serial.print(signalAngles[2],6);
+                Serial.print(",");
+                Serial.print(signalAngles[3],6);
+                Serial.print(",");
+            }
+        }
+        '
+    end
+    
+    function printAngleInformation(L1: UInt32, L2: UInt32) do
+        '
+        Signal L1Type = classifyPulse('&L1&', L1s, STORED_STEPS);
+        Signal L2Type = classifyPulse('&L2&', L2s, STORED_STEPS);
+        SignalType signalType = identifySignal(L1Type, L2Type);
+
+        Serial.print("\nC,");
+        Serial.print((int) L1Type);
+        Serial.print(",");
+        Serial.print((int) L2Type);
+        Serial.print(",");
+        Serial.print((int) signalType);
+        Serial.print(",");
+        Serial.print(calibrationStep);
+        Serial.print(",");
+        '
+    end
+    
+    function updateLastPackageArrays(L1: UInt32, L2: UInt32) do
+        '
+        L1s[signalIndex] = '&L1&';
+        L2s[signalIndex] = '&L2&';
+        
+        // update index for next itteration
+        if (signalIndex < STORED_STEPS) {
+            signalIndex++;
+        } else {
+            signalIndex = 0;
+        }
+        '
+    end
+}

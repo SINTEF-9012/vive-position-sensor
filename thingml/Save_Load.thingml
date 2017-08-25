@@ -1,0 +1,89 @@
+import "../_Datatypes.thingml"
+
+thing fragment StoreMessages
+{
+
+    // Read
+	message readByte(id : UInt8);
+	message readConfig();
+
+	message byteRead(val : UInt8);
+	message configRead(bx : Double, by : Double, bz : Double, brx : Double, bry : Double, brz : Double, cx : Double, cy : Double, cz : Double, crx : Double, cry : Double, crz : Double);
+    
+    // Write
+    message writeByte(id : UInt8, val: UInt8);
+    message writeConfig(bx : Double, by : Double, bz : Double, brx : Double, bry : Double, brz : Double, cx : Double, cy : Double, cz : Double, crx : Double, cry : Double, crz : Double);
+
+	message byteWritten()
+	message configWritten()
+}
+
+thing Storer includes StoreMessages
+@c_header "
+    #include <constants.h>
+    
+#include <inttypes.h>
+#include <avr/eeprom.h>
+#include <avr/io.h>
+"
+
+{
+	provided port reader {
+		receives readByte, readConfig
+		sends byteRead, configRead
+	}
+
+	
+	provided port writer {
+        receives writeByte, writeConfig
+        sends byteWritten, configWritten
+	}
+	
+	statechart EESave init Idle 
+	{
+	    state Idle {
+		    
+		    internal event m: reader?readByte action do 
+		        reader!byteRead('eeprom_read_byte((uint8_t*) '&m.id&')')
+		    end
+		    
+			internal event m: reader?readConfig action do '
+    			udouble ud; 
+    			for (int i = 0; i < 96; i++) {
+    				ud.b[i] = eeprom_read_byte((uint8_t*) i+1);
+    			}'
+    			reader!configRead('ud.d[0]','ud.d[1]','ud.d[2]','ud.d[3]','ud.d[4]','ud.d[5]','ud.d[6]','ud.d[7]','ud.d[8]','ud.d[9]','ud.d[10]','ud.d[11]')
+			end
+			
+			
+			internal event m: writer?writeByte action do
+        		'
+        		if('&m.val&' != eeprom_read_byte((uint8_t*) '&m.id&'))	eeprom_write_byte((uint8_t*) '&m.id&','&m.val&');'
+        		writer!byteWritten()
+			end
+			
+			internal event m: writer?writeConfig action do '
+			
+			    udouble data;
+			    data.d[0] = '&m.bx&';
+			    data.d[1] = '&m.by&';
+			    data.d[2] = '&m.bz&';
+			    data.d[3] = '&m.brx&';
+			    data.d[4] = '&m.bry&';
+			    data.d[5] = '&m.brz&';
+			    data.d[6] = '&m.cx&';
+			    data.d[7] = '&m.cy&';
+			    data.d[8] = '&m.cz&';
+			    data.d[9] = '&m.crx&';
+			    data.d[10] = '&m.cry&';
+			    data.d[11] = '&m.crz&';
+			    			    
+			    for (int i = 0; i < 96; i++) {
+                    if(data.b[i] != eeprom_read_byte((uint8_t*) i+1))	eeprom_write_byte((uint8_t*) i+1, data.b[i]);
+                }'
+			    writer!configWritten()
+			end
+			
+		}
+	}
+}

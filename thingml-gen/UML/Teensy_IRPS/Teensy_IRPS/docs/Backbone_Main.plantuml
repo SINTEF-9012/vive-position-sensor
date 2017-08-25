@@ -1,0 +1,43 @@
+@startuml
+skinparam defaultTextAlignment left
+caption Behavior of thing Backbone
+[*] --> Main
+state Main{
+state Load_Calibration{
+	Load_Calibration : entry / do \nStateHandler!currentState(1)\nCalibrationStorerABC!load()\nend\n
+
+Load_
+Calibration --> Validate_Calibration : calibrator?endcalibrate\naction CalibrationStorerABC!save()\n\n||m:CalibrationStorerABC?endload\naction sendStatus(5)\n
+
+Load_
+
+Calibration --> Calibration : m:calibrator?errcalibrate\n||presser?long_press\n||m:CalibrationStorerABC?errorload\naction sendStatus(6)\n
+}
+state Calibration{
+	Calibration : entry / do \nStateHandler!currentState(2)\ncalibrator!calibrate()\nend\n
+	Calibration : presser?click / \naction calibrator!entrypoint()\n
+	Calibration : m:AngleReceiver?allAngles / \naction calibrator!receiveangle(...)\n
+}
+state Validate_Calibration{
+	Validate_Calibration : entry / do \nStateHandler!currentState(3)\nvalidator!validate()\nend\n
+
+Validate_Calibration --> Calibration : m:validator?errvalidate
+
+Validate_Calibration --> Runner : m:validator?endvalidate
+}
+state Runner{
+	Runner : entry / do \nStateHandler!currentState(4)\nRunner!run()\nend\n
+
+Runner --> Calibration : presser?long_press
+	Runner : angles:AngleReceiver?allAngles / \naction Position!baseStationAngles(...)\n
+	Runner : p:Position?cartesianCoordinates / \naction printer!printPoint(...)\n
+	Runner : m:Position?lineSeparation / \naction printer!printLineSeparation(lineSeparation.dist)\n
+}
+[*] --> Load_Calibration
+	Main : entry / 'timeout_angleStatus();'\n
+	Main : AngleReceiver?allAngles / \naction 'angleReadingArrived = true;'\n
+	Main : m:StateHandler?currentState / \naction do \npixel!stateID(currentState.id)\n'if (DEBUG)'\nprinter!printOperationState(currentState.id)\nend\n
+	Main : m:StatusHandler?status / \naction sendStatus(status.id)\n
+	Main : presser?double_click / \naction 'VERBOSE = DEBUG & !VERBOSE;'\n
+}
+@enduml

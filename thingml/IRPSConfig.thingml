@@ -1,0 +1,69 @@
+import "Backbone_IRPS.thingml"
+
+import "IR-Reader/PulseReader.thingml"
+import "IR-Reader/PackageReader.thingml"
+import "IR-Reader/AngleReader.thingml"
+import "Runner.thingml"
+import "Calibrator.thingml"
+
+
+configuration Teensy_IRPS
+@teensy_corepath 		"../../../../c/lib/core/teensy3"
+@teensy_externpath 		"../../../../c/utils"
+@teensy_libpath 		"../../../../c/lib/Adafruit_NeoPixel"
+@teensy_fifosize "512"
+{
+	/* Begin Communication configuration */
+	instance button : Button
+	instance softButton : SoftButton
+	instance blinker : Blinker
+	instance serial : SerialOut
+    instance serialIn: SerialIn
+
+	instance pulseReader : PulseReader
+	instance packageReader : PackageReader
+	instance angleReader : AngleReader
+
+	instance backbone : Backbone
+	instance runner : Runner
+	instance calibrator : Calibrator
+	instance calibrationStorer : CalibrationStorer
+	instance storer : Storer
+	instance calibrationValidator : CalibrationValidator
+
+	// Buttons and serial
+	connector softButton.Button => button.evt
+	connector backbone.presser => softButton.SoftButton
+	connector backbone.printer => serial.basic
+	connector backbone.serialRead => serialIn.serialcall
+
+
+	// Status messages
+
+    connector backbone.StatusHandler => packageReader.StatusSender
+    connector backbone.StatusHandler => angleReader.StatusSender
+    connector backbone.StatusHandler => calibrator.StatusSender
+    connector backbone.StatusHandler => runner.StatusSender
+
+    connector backbone.pixel => blinker.neopixel
+
+
+    // Reading and converting signal-information
+    connector pulseReader.PulseSender => packageReader.PulseReceiver
+    connector packageReader.PackageSender => angleReader.PackageReceiver
+	connector backbone.AngleReceiver => angleReader.AngleSender
+	connector pulseReader.OverflowNotifier => angleReader.OverflowNotifier
+
+	// Runner
+    connector backbone.Run => runner.Run
+
+	// Calibrator
+	connector backbone.calibrator => calibrator.calibrator
+
+	// Storing and validating calibration
+	connector backbone.CalibrationStorer => calibrationStorer.storer
+	connector calibrationStorer.storeWriter => storer.writer
+	connector calibrationStorer.storeReader => storer.reader
+    connector backbone.validator => calibrationValidator.validator
+
+}

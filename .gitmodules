@@ -1,0 +1,6 @@
+[submodule "c/lib/Adafruit_NeoPixel"]
+	path = c/lib/Adafruit_NeoPixel
+	url = https://github.com/adafruit/Adafruit_NeoPixel.git
+[submodule "c/lib/core"]
+	path = c/lib/core
+	url = https://github.com/PaulStoffregen/cores.git

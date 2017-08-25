@@ -1,0 +1,44 @@
+import "../_Datatypes.thingml"
+import "Messages.thingml"
+
+thing fragment eRunner {
+    message baseStationAngles(bh: Double, bv: Double, ch: Double, cv: Double)
+    message coordinates(x: Double, y: Double, z: Double, separation: Double)
+}    
+
+thing Runner includes eRunner, StatusMessages
+
+@c_header "
+    #include <constants.h>
+    #include <calibration.hpp>
+"
+
+@c_global "
+    Pose bPose;
+    Pose cPose;
+"
+
+{
+    provided port Run { 
+        receives baseStationAngles
+	sends coordinates
+    }
+	
+    provided port StatusSender {
+        sends status
+    }   
+
+	statechart Running init Idle {
+        
+        internal event a: Run?baseStationAngles action do
+            'Vec p = positionFromAngles('&a.bh&','&a.bv&','&a.ch&','&a.cv&');'
+            Run!coordinates('p[0]','p[1]','p[2]', 'diststanceBetweenLines')
+            if ('diststanceBetweenLines > MAX_LINE_SEPARATION') StatusSender!status(0)
+        end
+        
+	    state Idle {
+	        on entry do
+	        end
+	    }
+	}
+}

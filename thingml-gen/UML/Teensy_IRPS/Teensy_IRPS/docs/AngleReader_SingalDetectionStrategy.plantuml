@@ -1,0 +1,21 @@
+@startuml
+skinparam defaultTextAlignment left
+caption Behavior of thing AngleReader
+[*] --> SingalDetectionStrategy
+state SingalDetectionStrategy{
+state PulseWidths{
+	PulseWidths : entry / StatusSender!status(12)\n
+
+PulseWidths --> ArrivalTime : Transitions?startTimeCalibrated
+	PulseWidths : a:PackageReceiver?packageDetectedEvent / \naction do \nupdateLastPackageArrays(...)\n'\n                if (initiationCount >= STORED_STEPS) {\n                    Signal L1Type = classifyPulse(' & packageDetectedEvent.durationL1 & ', L1s, STORED_STEPS);\n                    Signal L2Type = classifyPulse(' & packageDetectedEvent.durationL2 & ', L2s, STORED_STEPS);\n    \n                    SignalType signalType = identifySignal(L1Type, L2Type);\n                    \n                    if (calibrationStep % 4 == signalType) {\n                        calibrationStep++;\n                    } else {\n                        calibrationStep = 0;\n                    }\n                    \n                    if (calibrationStep == CALIBRATION_SAMPLES * 4 + 1) {'\nTransitions!startTimeCalibrated()\n'calibrationStartTime = ' & packageDetectedEvent.startTimeL1 & ' % (PERIOD * 4);\n                    }\n                    '\n...\n'#ifdef PRINTING'\nprintAngleInformation(...)\n'#endif\n                } else {\n                    initiationCount++;\n                }'\nend\n
+}
+state ArrivalTime{
+	ArrivalTime : entry / StatusSender!status(13)\n
+
+ArrivalTime --> PulseWidths : Transitions?recalibrate
+	ArrivalTime : a:PackageReceiver?packageDetectedEvent / \naction do \n'\n                // Handle first few pulses in signal that arrive "before" startTime (after foverflow)\n                uint32_t startTime = ' & packageDetectedEvent.startTimeL1 & ' < calibrationStartTime ? ' & packageDetectedEvent.startTimeL1 & ' += 4*PERIOD : ' & packageDetectedEvent.startTimeL1 & ';\n                \n                // Send event if one or more angles have not been read\n                uint32_t diff = startTime - lastStartTime;\n                if (!(MIN_PACKAGE_SEPARATION < diff && diff < MAX_PACKAGE_SEPARATION)) {\n                    printWhenZero = 4; // Wait until this angle-measurnment arrives next (in four itterations). '\nStatusSender!status(1)\n'}\n                lastStartTime = startTime;\n                \n                // Classify package\n                int val = ((startTime-calibrationStartTime + PERIOD/2) / PERIOD) % 4;\n                SignalType signalType = SignalType(val);\n        \n                // Handle timing drift (from teensy or Base Stations)\n                double n = (double) (startTime-calibrationStartTime)/(PERIOD);\n                double difference = n - (long)n;\n        \n                if (difference < TIME_DRIFT_CORRECTOIN_THRESHOLD) {\n                    calibrationStartTime += TIME_DRIFT_CORRECTOIN_CONSTANT;\n                } else if (1-TIME_DRIFT_CORRECTOIN_THRESHOLD < difference) {\n                    calibrationStartTime -= TIME_DRIFT_CORRECTOIN_CONSTANT;\n                } else {\n                    if (recalibrateCount++ > RECALIBRATE_SAMPLES) {'\nTransitions!recalibrate()\n...\nStatusSender!status(10)\n'}\n                    return;\n                }\n                if (recalibrateCount != 0) recalibrateCount = 0;\n                '\nupdateAngles(...)\n'if (printWhenZero == 0) {'\nAngleSender!allAngles(...)\n'} else {\n                    printWhenZero--;\n                } \n                \n                #ifdef PRINTING'\nprintAngleInformation(...)\n'#endif'\nend\n
+}
+[*] --> PulseWidths
+	SingalDetectionStrategy : OverflowNotifyer?timerOverflow / \naction 'calibrationStartTime = (calibrationStartTime + (PERIODS_PER_CLOCK+1) * PERIOD * 4) % (PERIOD * 4);'\n
+}
+@enduml

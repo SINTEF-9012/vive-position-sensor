@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="287px" height="299px" viewBox="0 0 287 299" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 44.1 (41455) - http://www.bohemiancoding.com/sketch -->
+    <title>Base station</title>
+    <desc>Created with Sketch.</desc>
+    <defs>
+        <path d="M34,145 L253,145 L253,145 C254.104569,145 255,145.895431 255,147 L255,249 L255,249 C255,265.568542 241.568542,279 225,279 L62,279 L62,279 C45.4314575,279 32,265.568542 32,249 L32,147 L32,147 C32,145.895431 32.8954305,145 34,145 Z" id="path-1"></path>
+    </defs>
+    <g id="Sensor" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Base-station">
+            <g id="Rectangle">
+                <use fill="#D8D8D8" fill-rule="evenodd" xlink:href="#path-1"></use>
+                <path stroke="#222222" stroke-width="1" d="M34,145.5 C33.1715729,145.5 32.5,146.171573 32.5,147 L32.5,249 C32.5,265.2924 45.7075999,278.5 62,278.5 L225,278.5 C241.2924,278.5 254.5,265.2924 254.5,249 L254.5,147 C254.5,146.171573 253.828427,145.5 253,145.5 L34,145.5 Z"></path>
+            </g>
+            <path d="M144,213 L144,-0.5" id="Line" stroke="#979797" stroke-linecap="square"></path>
+            <path d="M99.8320312,127.179687 C99.8320312,127.179687 109.087951,119.958285 120.298981,116.418595 C131.510012,112.878906 144.140625,112.878906 144.140625,112.878906" id="Path-2" stroke="#979797"></path>
+            <path d="M144.5,211.5 L31,1" id="Line" stroke="#FF0000" stroke-width="2" stroke-linecap="square"></path>
+            <text id="ɸ" font-family="Helvetica" font-size="20" font-weight="normal" fill="#232323">
+                <tspan x="109.77832" y="105">ɸ</tspan>
+            </text>
+            <text id="–" font-family="Helvetica" font-size="20" font-weight="normal" fill="#232323">
+                <tspan x="157.438477" y="49">–</tspan>
+            </text>
+            <text id="+" font-family="Helvetica" font-size="20" font-weight="normal" fill="#232323">
+                <tspan x="119.160156" y="49">+</tspan>
+            </text>
+        </g>
+    </g>
+</svg>

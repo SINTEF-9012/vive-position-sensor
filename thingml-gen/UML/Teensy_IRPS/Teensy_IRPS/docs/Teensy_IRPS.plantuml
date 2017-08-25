@@ -1,0 +1,37 @@
+@startuml
+caption Instances and Connectors in configuration Teensy_IRPS
+component softButton<<PSM>>
+component packageReader<<PSM>>
+component angleReader<<PSM>>
+component calibrator<<PSM>>
+component runner<<PSM>>
+component calibrationStorer<<PSM>>
+component blinker<<PSM>>
+component pulseReader<<PSM>>
+component serial<<PSM>>
+component serialIn<<PSM>>
+component backbone<<PSM>>
+component button<<PSM>>
+component storer<<PSM>>
+component calibrationValidator<<PIM>>
+backbone -(0- serial : printer => basic
+backbone -(0- runner : Runner => Progress
+packageReader -(0- angleReader : PackageSender => PackageReceiver
+softButton -(0- button : Button => evt
+calibrationStorer -(0- storer : storeReader => reader
+backbone -(0- calibrationValidator : validator => validator
+backbone -(0- packageReader : StatusHandler => StatusSender
+backbone -(0- angleReader : StatusHandler => StatusSender
+backbone -(0- runner : Position => Position
+backbone -(0- runner : StatusHandler => StatusSender
+backbone -(0- calibrator : StatusHandler => StatusSender
+pulseReader -(0- packageReader : PulseSender => PulseReceiver
+pulseReader -(0- angleReader : OverflowNotifyer => OverflowNotifyer
+backbone -(0- blinker : pixel => neopixel
+calibrationStorer -(0- storer : storeWriter => writer
+backbone -(0- calibrator : calibrator => calibrator
+backbone -(0- softButton : presser => SoftButton
+backbone -(0- serialIn : serialRead => serialcall
+backbone -(0- angleReader : AngleReceiver => AngleSender
+backbone -(0- calibrationStorer : CalibrationStorerABC => storerABC
+@enduml

@@ -1,0 +1,404 @@
+@startuml
+caption Things used in configuration Teensy_IRPS
+class SoftButton <<(T,#F94918)PSM>> {
+..Properties..
+-long_delay : UInt16 = 1000
+-double_delay : UInt16 = 250
+..Port Button..
+>>press
+>>release
+..Port Timer..
+>>timer_timeout
+<<timer_timeout
+..Port SoftButton..
+<<click
+<<double_click
+<<long_press
+..Functions..
+-timeout_button() : void
+}
+note left of SoftButton : <b>@c_header</b> <color:royalBlue>"#include <Timer.h>"</color>\n<b>@c_global</b> <color:royalBlue>"extern struct SoftButton_Instance softButton_var;"</color>\n
+class ButtonMsgs <<(F,#BC74ED)Fragment>> {
+..Messages..
+-press()
+-release()
+}
+class iSoftButton <<(F,#BC74ED)Fragment>> {
+..Messages..
+-timer_timeout()
+}
+class SoftButtonMsgs <<(F,#BC74ED)Fragment>> {
+..Messages..
+-click()
+-double_click()
+-long_press()
+}
+class PackageReader <<(T,#F94918)PSM>> {
+..Port PulseReceiver..
+>>pulseDetectedEvent
+..Port PackageSender..
+<<packageDetectedEvent
+..Port StatusSender..
+<<status
+..Functions..
+-pulse(startTime : UInt32duration : UInt32) : void
+}
+note left of PackageReader : <b>@c_header</b> <color:royalBlue>"\n        #include <constants.h>\n    "</color>\n<b>@c_global</b> <color:royalBlue>"        \n        // startTimes and durations with matching data at same idex\n        uint32_t startTimes [STORED_TIME_STEPS]; // default init to zero in C\n        uint32_t durations [STORED_TIME_STEPS];\n        \n        int identifyedSteps = 0;\n        int startCount = 0;\n    "</color>\n
+class IRMessages <<(F,#BC74ED)Fragment>> {
+..Messages..
+-pulseDetectedEvent(start : UInt32duration : UInt32)
+-packageDetectedEvent(startTimeL1 : UInt32startTimeL2 : UInt32durationL1 : UInt32durationL2 : UInt32signal : UInt32)
+-allAngles(bh : Doublebv : Doublech : Doublecv : Double)
+-timerOverflow()
+}
+class StatusMessages <<(F,#BC74ED)Fragment>> {
+..Messages..
+-status(id : UInt8)
+-currentState(id : UInt8)
+-startPrinting()
+-stopPrinting()
+}
+class AngleReader <<(T,#F94918)PSM>> {
+..Messages..
+-startTimeCalibrated()
+-recalibrate()
+..Port PackageReceiver..
+>>packageDetectedEvent
+..Port AngleSender..
+<<allAngles
+..Port OverflowNotifyer..
+>>timerOverflow
+..Port StatusSender..
+<<status
+..Port Transitions..
+>>startTimeCalibrated
+>>recalibrate
+<<startTimeCalibrated
+<<recalibrate
+..Functions..
+-updateAngles(inputSignal : UInt32signalType : UInt8L2delay : UInt32calibrated : Boolean) : void
+-printAngleInformation(L1 : UInt32L2 : UInt32) : void
+-updateLastPackageArrays(L1 : UInt32L2 : UInt32) : void
+}
+note left of AngleReader : <b>@c_header</b> <color:royalBlue>"\n        #include <constants.h>\n        \n        enum SignalType {\n            // b - master, c - slave\n            // h - horisontal, v - vertical\n            bh = 0, bv = 1, ch = 2, cv = 3, error = 4\n        };\n    "</color>\n<b>@c_global</b> <color:royalBlue>"\n    \n        // Last package arrays\n        uint32_t L1s [STORED_STEPS];\n        uint32_t L2s [STORED_STEPS];\n        int signalIndex = 0;\n        \n        double signalAngles[4];         // Last read angles sufficiently close to its own previous value\n        double lastSignalAngles[4];     // Last read angles\n        \n        uint32_t lastStartTime = 0;\n        \n        uint32_t calibrationStartTime;\n        int calibrationStep = 0;\n        int initiationCount = 0;\n        int recalibrateCount = 0;\n        \n        int printWhenZero = 0;         // Only print when we have gotten four consecutive angles\n        \n        enum Signal {\n            off = 0, horisontal = 1, vertical = 2\n        };\n        \n        uint32_t average(uint32_t L[], int count) {\n            uint32_t sum = 0;\n        \n            for (int i = 0; i < count; i++) {\n                sum += L[i];\n            }\n            return sum/count;\n        }\n        \n        uint32_t maxVal(uint32_t L[], int count) {\n            uint32_t ret = L[0];\n            for (int i = 1; i<count; i++) {\n                if (L[i] > ret) {\n                    ret = L[i];\n                }\n            }\n            return ret;\n        }\n        \n        uint32_t minVal(uint32_t L[], int count) {\n            uint32_t ret = L[0];\n            for (int i = 1; i<count; i++) {\n                if (L[i] < ret) {\n                    ret = L[i];\n                }\n            }\n            return ret;\n        }\n        \n        Signal classifyPulse(uint32_t signal, uint32_t L[], int count) {\n        \n            int min = minVal(L, count);\n            int max = maxVal(L, count);\n        \n            int category = (7*(signal - min + PULSE_WIDTH_SEPARATION/2))/(max - min);\n            \n            switch (category) {\n                case 0:\n                    return Signal::horisontal;\n                    break;\n                case 1:\n                    return Signal::vertical;\n                    break;\n                case 2:\n                    return Signal::horisontal;\n                    break;\n                case 3:\n                    return Signal::vertical;\n                    break;\n                default:\n                    return Signal::off;\n                    break;\n            }\n        \n            return Signal::off;   \n        }\n        \n        SignalType identifySignal(Signal L1, Signal L2) {\n            return (L1 == Signal::off) ? (L2 == Signal::horisontal) ? SignalType::ch:(L2 == Signal::vertical) ? SignalType::cv : SignalType::error : (L2 == Signal::off) ? (L1 == Signal::horisontal) ? SignalType::bh : (L1 == Signal::vertical) ? SignalType::bv : SignalType::error : SignalType::error;\n        }\n    "</color>\n
+class Calibrator <<(T,#F94918)PSM>> {
+..Port calibrator..
+>>calibrate
+>>entrypoint
+>>receiveangle
+>>receivecalibration
+<<endcalibrate
+<<errcalibrate
+<<sendangles
+<<calibrationfromserial
+..Port StatusSender..
+<<status
+..Port avt..
+>>calibrating
+>>calibrationComplete
+>>calibrationFailed
+<<calibrating
+<<calibrationComplete
+<<calibrationFailed
+..Functions..
+-printCalibration() : void
+}
+note left of Calibrator : <b>@c_header</b> <color:royalBlue>"\n    #include <Timer.h>\n    #include <constants.h>\n    #include <calibration.hpp>\n"</color>\n<b>@c_global</b> <color:royalBlue>"\n    double angleValues[CALIBRATION_POINT_COLLECTION_COUNT][4] = {0};\n    int angleIndex = 0;\n    bool endCalibration = 0;\n    \n    uint8_t fourCounter = 0;\n"</color>\n
+class iCalibration <<(F,#BC74ED)Fragment>> {
+..Messages..
+-calibrating()
+-calibrationComplete()
+-calibrationFailed()
+}
+class eCalibration <<(F,#BC74ED)Fragment>> {
+..Messages..
+-calibrate()
+-entrypoint()
+-receiveangle(bh : Doublebv : Doublech : Doublecv : Double)
+-receivecalibration(bx : Doubleby : Doublebz : Doublebrx : Doublebry : Doublebrz : Doublecx : Doublecy : Doublecz : Doublecrx : Doublecry : Doublecrz : Double)
+-endcalibrate()
+-errcalibrate()
+-sendangles(bh : Doublebv : Doublech : Doublecv : Double)
+-calibrationfromserial()
+}
+class Runner <<(T,#F94918)PSM>> {
+..Port Progress..
+>>run
+..Port Position..
+>>baseStationAngles
+<<cartesianCoordinates
+<<lineSeparation
+..Port StatusSender..
+<<status
+}
+note left of Runner : <b>@c_header</b> <color:royalBlue>"\n    #include <constants.h>\n    #include <calibration.hpp>\n"</color>\n<b>@c_global</b> <color:royalBlue>"\n    Pose bPose;\n    Pose cPose;\n"</color>\n
+class RunnerMessages <<(F,#BC74ED)Fragment>> {
+..Messages..
+-baseStationAngles(bh : Doublebv : Doublech : Doublecv : Double)
+-cartesianCoordinates(x : Doubley : Doublez : Double)
+-lineSeparation(dist : Double)
+}
+class eRunner <<(F,#BC74ED)Fragment>> {
+..Messages..
+-run()
+}
+class CalibrationStorer <<(T,#F94918)PSM>> {
+..Messages..
+-storerToIdle()
+..Port storeReader..
+>>byteRead
+>>configRead
+<<readByte
+<<readConfig
+..Port storeWriter..
+>>byteWritten
+>>configWritten
+<<writeByte
+<<writeConfig
+..Port storerABC..
+>>load
+>>save
+<<endload
+<<errorload
+..Port progress..
+>>storerToIdle
+<<storerToIdle
+}
+note left of CalibrationStorer : <b>@c_header</b> <color:royalBlue>"\n    #import <calibration.hpp>\n"</color>\n<b>@c_global</b> <color:royalBlue>"\n    #define STORE_KEY 42\n"</color>\n
+class StoreMessages <<(F,#BC74ED)Fragment>> {
+..Messages..
+-readByte(id : UInt8)
+-readConfig()
+-byteRead(val : UInt8)
+-configRead(bx : Doubleby : Doublebz : Doublebrx : Doublebry : Doublebrz : Doublecx : Doublecy : Doublecz : Doublecrx : Doublecry : Doublecrz : Double)
+-writeByte(id : UInt8val : UInt8)
+-writeConfig(bx : Doubleby : Doublebz : Doublebrx : Doublebry : Doublebrz : Doublecx : Doublecy : Doublecz : Doublecrx : Doublecry : Doublecrz : Double)
+-byteWritten()
+-configWritten()
+}
+class eCalibrationStorer <<(F,#BC74ED)Fragment>> {
+..Messages..
+-load()
+-endload()
+-errorload()
+-save()
+}
+class Blinker <<(T,#F94918)PSM>> {
+..Messages..
+-blink()
+..Port evt..
+>>blink
+<<blink
+..Port neopixel..
+>>stateID
+>>statusID
+..Functions..
+-startLEDFlashAfterDuration(duration : UInt32) : void
+-callback_message_flash() : void
+-setColorForDuration(color : UInt32duration : UInt32) : void
+-callback_message_neopixel() : void
+-timeoutColorChangeForDuration(duration : UInt32) : void
+-callback_message_timeout() : void
+}
+note left of Blinker : <b>@c_header</b> <color:royalBlue>"\n#include <Timer.h>\n#include <Adafruit_NeoPixel.h>\n#include <Color_Helper.h>\n"</color>\n<b>@c_global</b> <color:royalBlue>"\nextern struct Blinker_Instance blinker_var;\nboolean current_blink = HIGH;\n\n#define PIN 12\n#define NUM_LEDS 1\n#define BRIGHTNESS 50\n\nuint32_t returnColor = RED;\nbool timeout = false;\nint8_t timeoutPriority = 0;\n\nAdafruit_NeoPixel led = Adafruit_NeoPixel(NUM_LEDS, PIN, NEO_GRBW + NEO_KHZ800);\n"</color>\n
+class eblinker <<(F,#BC74ED)Fragment>> {
+..Messages..
+-statusID(id : UInt8)
+-stateID(id : UInt8)
+}
+class PulseReader <<(T,#F94918)PSM>> {
+..Messages..
+-pulseDetected(start : UInt32duration : UInt32)
+..Port PulseSender..
+<<pulseDetectedEvent
+..Port OverflowNotifyer..
+<<timerOverflow
+..Port Transitions..
+>>pulseDetected
+<<pulseDetected
+..Functions..
+-initialize() : void
+-interruptServiceRoutine() : void
+}
+note left of PulseReader : <b>@c_header</b> <color:royalBlue>"\n        #include <constants.h>\n    "</color>\n<b>@c_global</b> <color:royalBlue>"\n        volatile uint32_t ftm0_cnt_long;\n        extern struct PulseReader_Instance pulseReader_var;\n        bool STOP = false;\n    "</color>\n
+class SerialOut <<(T,#F94918)PSM>> {
+..Port basic..
+>>printStatus
+>>printOperationState
+>>printN
+>>printPoint
+>>printAngles
+>>printLineSeparation
+}
+class msgout <<(F,#BC74ED)Fragment>> {
+..Messages..
+-printStatus(id : UInt8)
+-printOperationState(id : UInt8)
+-printN(duration : UInt32)
+-printPoint(x : Doubley : Doublez : Double)
+-printLineSeparation(dist : Double)
+-printAngles(bh : Doublebv : Doublech : Doublecv : Double)
+}
+class SerialIn <<(T,#F94918)PSM>> {
+..Port serialcall..
+>>waitcalibration
+<<calibrationreceived
+..Port Timer..
+>>serial_timeout
+<<serial_timeout
+..Functions..
+-timeout_serialreader() : void
+}
+note left of SerialIn : <b>@c_header</b> <color:royalBlue>"#include <Timer.h>\n#include <constants.h>"</color>\n<b>@c_global</b> <color:royalBlue>"extern struct SerialIn_Instance serialIn_var;"</color>\n
+class msgin <<(F,#BC74ED)Fragment>> {
+..Messages..
+-waitcalibration()
+-calibrationreceived(bx : Doubleby : Doublebz : Doublebrx : Doublebry : Doublebrz : Doublecx : Doublecy : Doublecz : Doublecrx : Doublecry : Doublecrz : Double)
+}
+class iserialin <<(F,#BC74ED)Fragment>> {
+..Messages..
+-serial_timeout()
+}
+class Backbone <<(T,#F94918)PSM>> {
+..Messages..
+-toIdle()
+..Port AngleReceiver..
+>>allAngles
+..Port Position..
+>>cartesianCoordinates
+>>lineSeparation
+<<baseStationAngles
+..Port Runner..
+<<run
+..Port CalibrationStorerABC..
+>>endload
+>>errorload
+<<load
+<<save
+..Port validator..
+>>endvalidate
+>>errvalidate
+<<validate
+..Port calibrator..
+>>endcalibrate
+>>errcalibrate
+>>sendangles
+>>calibrationfromserial
+<<calibrate
+<<entrypoint
+<<receiveangle
+<<receivecalibration
+..Port printer..
+<<printStatus
+<<printOperationState
+<<printN
+<<printPoint
+<<printAngles
+<<printLineSeparation
+..Port serialRead..
+>>calibrationreceived
+<<waitcalibration
+..Port pixel..
+<<stateID
+<<statusID
+..Port presser..
+>>click
+>>double_click
+>>long_press
+..Port StatusHandler..
+>>status
+..Port StateHandler..
+>>currentState
+<<currentState
+..Port transitions..
+>>toIdle
+<<toIdle
+..Functions..
+-sendStatus(id : UInt8) : void
+-timeout_angleStatus() : void
+}
+note left of Backbone : <b>@c_header</b> <color:royalBlue>"\n        #include <Timer.h>\n        #include <constants.h>\n    "</color>\n<b>@c_global</b> <color:royalBlue>"\n        extern struct Backbone_Instance backbone_var; // for timeout_angleStatus() function\n   \n        bool angleReadingArrived = false; // For alerting user is no angles are received over longer period\n        \n        // Globally available debug flags (extern in constants.h)\n        bool DEBUG = false; // TODO: read from pin\n        bool VERBOSE = false;\n    "</color>\n
+class eCalibrationValidator <<(F,#BC74ED)Fragment>> {
+..Messages..
+-validate()
+-endvalidate()
+-errvalidate()
+}
+class Button <<(T,#F94918)PSM>> {
+..Properties..
+-PIN : UInt8 = 7
+..Port clock..
+>>ms25_tic
+<<ms25_tic
+..Port evt..
+<<press
+<<release
+..Functions..
+-is_pressed() : Boolean
+-time_25ms() : void
+}
+note left of Button : <b>@c_header</b> <color:royalBlue>"#include <Timer.h>"</color>\n<b>@c_global</b> <color:royalBlue>"extern struct Button_Instance button_var;"</color>\n
+class TimerMessages <<(F,#BC74ED)Fragment>> {
+..Messages..
+-ms25_tic()
+}
+class Storer <<(T,#F94918)PSM>> {
+..Port reader..
+>>readByte
+>>readConfig
+<<byteRead
+<<configRead
+..Port writer..
+>>writeByte
+>>writeConfig
+<<byteWritten
+<<configWritten
+}
+note left of Storer : <b>@c_header</b> <color:royalBlue>"\n    #include <constants.h>\n"</color>\n
+class CalibrationValidator <<(T,#5BBF09)PIM>> {
+..Messages..
+-validating()
+..Port validator..
+>>validate
+<<endvalidate
+<<errvalidate
+..Port avt..
+>>validating
+<<validating
+}
+ButtonMsgs <|-- SoftButton
+iSoftButton <|-- SoftButton
+SoftButtonMsgs <|-- SoftButton
+IRMessages <|-- PackageReader
+StatusMessages <|-- PackageReader
+IRMessages <|-- AngleReader
+StatusMessages <|-- AngleReader
+iCalibration <|-- Calibrator
+eCalibration <|-- Calibrator
+StatusMessages <|-- Calibrator
+RunnerMessages <|-- Runner
+eRunner <|-- Runner
+StatusMessages <|-- Runner
+StoreMessages <|-- CalibrationStorer
+eCalibrationStorer <|-- CalibrationStorer
+eblinker <|-- Blinker
+IRMessages <|-- PulseReader
+msgout <|-- SerialOut
+msgin <|-- SerialIn
+iserialin <|-- SerialIn
+msgout <|-- Backbone
+msgin <|-- Backbone
+eCalibrationStorer <|-- Backbone
+eCalibrationValidator <|-- Backbone
+eCalibration <|-- Backbone
+SoftButtonMsgs <|-- Backbone
+StatusMessages <|-- Backbone
+IRMessages <|-- Backbone
+RunnerMessages <|-- Backbone
+eRunner <|-- Backbone
+eblinker <|-- Backbone
+ButtonMsgs <|-- Button
+TimerMessages <|-- Button
+StoreMessages <|-- Storer
+eCalibrationValidator <|-- CalibrationValidator
+@enduml
